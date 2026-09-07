@@ -1,4 +1,4 @@
-package org.com;
+package org.angels.care;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -14,7 +14,7 @@ public class Main extends Application {
 
         Label label = new Label("Hello, Angels Care!\n" + dbMessage);
         StackPane root = new StackPane(label);
-        Scene scene = new Scene(root, 400, 250);
+        Scene scene = new Scene(root, 800, 500);
 
         stage.setTitle("Angels Care - Hello World");
         stage.setScene(scene);

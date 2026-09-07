@@ -17,33 +17,27 @@ repositories {
 }
 
 dependencies {
-
-    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
-
     // Use JUnit test framework.
     testImplementation(libs.junit)
 
     // This dependency is used by the application.
     implementation(libs.guava)
+    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
 }
-
-
 
 // Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
-
 
 javafx {
     version = "21.0.2"
     modules = listOf("javafx.controls")
 }
 
-
 application {
     // Define the main class for the application.
-    mainClass = "org.com.Main"
+    mainClass = "org.angels.care.Main"
 }

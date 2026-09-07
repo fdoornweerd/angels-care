@@ -21,5 +21,3 @@ plugins {
 
 rootProject.name = "angels-care"
 include("app")
-
-
