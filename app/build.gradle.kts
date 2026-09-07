@@ -8,6 +8,7 @@
 plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
+    id("org.openjfx.javafxplugin") version "0.1.0"
 }
 
 repositories {
@@ -16,12 +17,17 @@ repositories {
 }
 
 dependencies {
+
+    implementation("org.xerial:sqlite-jdbc:3.46.0.0")
+
     // Use JUnit test framework.
     testImplementation(libs.junit)
 
     // This dependency is used by the application.
     implementation(libs.guava)
 }
+
+
 
 // Apply a specific Java toolchain to ease working on different environments.
 java {
@@ -30,7 +36,14 @@ java {
     }
 }
 
+
+javafx {
+    version = "21.0.2"
+    modules = listOf("javafx.controls")
+}
+
+
 application {
     // Define the main class for the application.
-    mainClass = "org.example.App"
+    mainClass = "org.com.Main"
 }
