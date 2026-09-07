@@ -9,6 +9,7 @@ plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
     id("org.openjfx.javafxplugin") version "0.1.0"
+    id("org.beryx.jlink") version "3.0.1"
 }
 
 repositories {
@@ -37,7 +38,19 @@ javafx {
     modules = listOf("javafx.controls")
 }
 
+jlink {
+    imageZip.set(layout.buildDirectory.file("distributions/app-${javafx.version}.zip"))
+    options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
+    launcher {
+        name = "AngelsCare"
+    }
+    jpackage {
+        installerType = "exe"
+    }
+}
+
 application {
     // Define the main class for the application.
-    mainClass = "org.angels.care.Main"
+    mainModule = "org.angelscare.management"
+    mainClass = "org.angelscare.management.Main"
 }

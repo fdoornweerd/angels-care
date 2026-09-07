@@ -1,4 +1,4 @@
-package org.angels.care;
+package org.angelscare.management;
 
 import javafx.application.Application;
 import javafx.scene.Scene;

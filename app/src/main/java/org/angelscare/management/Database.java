@@ -1,4 +1,4 @@
-package org.angels.care;
+package org.angelscare.management;
 
 import java.io.File;
 import java.sql.Connection;
