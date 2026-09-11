@@ -11,6 +11,14 @@ public class Database {
 
     private static final String DB_URL = "jdbc:sqlite:" + getDbPath();
 
+    static {
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("SQLite JDBC driver not found on classpath/module path", e);
+        }
+    }
+
     private static String getDbPath() {
         String userHome = System.getProperty("user.home");
         File appDataDir = new File(userHome, "AngelsCareData");
