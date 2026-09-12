@@ -1,17 +1,13 @@
 /*
- * Angels Care - JavaFX + SQLite desktop app.
+ * Angels Care - JavaFX desktop app with a local SQLite database.
  *
- * Packaging is deliberately parameterised so we can ship several differently-packaged builds of
- * the same code at once and find out which one survives on a locked-down Windows machine:
+ *   ./gradlew run        run it from source
+ *   ./gradlew jpackage   build a native installer for the platform you are on
  *
- *   ./gradlew jpackage -PpackagingVariant=installer          -> .exe installer, per-user, shortcuts
- *   ./gradlew jpackage -PpackagingVariant=installer-console  -> same, but opens a console window
- *   ./gradlew jlinkZip -PpackagingVariant=portable           -> .zip, unzip and run, no installer
- *   ./gradlew jlinkZip -PpackagingVariant=portable-nostrip   -> .zip, unstripped image + bound services
+ * The Windows installer is built by CI, not locally - see README.md.
  */
 
 plugins {
-    // Apply the application plugin to add support for building a CLI application in Java.
     application
     id("org.openjfx.javafxplugin") version "0.1.0"
     id("org.beryx.jlink") version "3.0.1"
@@ -21,20 +17,16 @@ group = "org.angelscare"
 version = "1.0.0"
 
 repositories {
-    // Use Maven Central for resolving dependencies.
     mavenCentral()
 }
 
 dependencies {
-    // Use JUnit test framework.
     testImplementation(libs.junit)
 
-    // This dependency is used by the application.
     implementation(libs.guava)
     implementation("org.xerial:sqlite-jdbc:3.46.0.0")
 }
 
-// Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
@@ -46,43 +38,26 @@ javafx {
     modules = listOf("javafx.controls")
 }
 
-val packagingVariant = (findProperty("packagingVariant") as String?) ?: "installer"
-val wantsConsole = packagingVariant.contains("console")
-val wantsStrippedImage = !packagingVariant.contains("nostrip")
 val onWindows = System.getProperty("os.name").lowercase().contains("win")
 
-val jlinkOptions = if (wantsStrippedImage) {
-    listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages")
-} else {
-    // An unstripped image, plus --bind-services so that jlink pulls in every service provider it
-    // can see. sqlite-jdbc publishes its driver as a java.sql.Driver service; if jlink is dropping
-    // that binding, this variant is the one that will work.
-    listOf("--bind-services")
-}
-
 jlink {
-    imageZip.set(layout.buildDirectory.file("distributions/AngelsCare-$packagingVariant.zip"))
-    options.set(jlinkOptions)
+    options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
     launcher {
         name = "AngelsCare"
     }
     jpackage {
-        installerName = "AngelsCare-$packagingVariant"
         appVersion = project.version.toString()
-        // The --win-* switches below are rejected outright by jpackage on macOS, so they are only
-        // applied on Windows; that keeps `./gradlew jpackage` usable for local testing on the Mac.
+        // The --win-* switches are rejected outright by jpackage on macOS, so they are applied only
+        // on Windows. That keeps `./gradlew jpackage` working on the Mac for local testing.
         if (onWindows) {
             installerType = "exe"
-            imageOptions = buildList<String> {
-                // --win-console makes the launcher a console app, so stdout/stderr and any stack
-                // trace stay on screen instead of vanishing with the process.
-                if (wantsConsole) add("--win-console")
-            }
+            installerName = "AngelsCare"
             installerOptions = listOf(
-                // Install under the user's profile: no UAC prompt, no Program Files permissions.
+                // Install into the user's own profile. No admin rights, no UAC prompt, and no
+                // permission problems from writing under Program Files.
                 "--win-per-user-install",
-                // Without these two, jpackage installs the app and creates NO way to launch it -
-                // no desktop icon, no Start menu entry. That alone looks like "nothing happens".
+                // Without these two, jpackage installs the application and creates no way to start
+                // it: no desktop icon and no Start menu entry. The installer appears to do nothing.
                 "--win-shortcut",
                 "--win-menu",
                 "--win-menu-group", "Angels Care",
@@ -93,48 +68,6 @@ jlink {
 }
 
 application {
-    // Define the main class for the application.
     mainModule = "org.angelscare.management"
     mainClass = "org.angelscare.management.Main"
 }
-
-// The zip jlink produces has no obvious entry point: the launcher sits at image\bin\AngelsCare.bat,
-// four folders down, next to java.exe and twenty other JDK tools. `portableZip` wraps the same image
-// in a folder with a single launcher at the top level, so extracting and double-clicking is the
-// whole procedure. The launcher also pauses on exit, so a crash leaves its message on screen
-// instead of closing the window instantly.
-val portableLauncherText = """
-@echo off
-title Angels Care
-echo Starting Angels Care...
-echo.
-call "%~dp0image\bin\AngelsCare.bat"
-echo.
-echo Angels Care has closed.
-echo.
-echo If it did not work, send this file back:
-echo    %USERPROFILE%\AngelsCareData\angels-care-startup.log
-echo.
-pause
-""".trimStart().replace("\n", "\r\n")
-
-val portableLauncher by tasks.registering {
-    val launcherFile = layout.buildDirectory.file("portable/Start Angels Care.bat")
-    val text = portableLauncherText
-    outputs.file(launcherFile)
-    doLast {
-        val file = launcherFile.get().asFile
-        file.parentFile.mkdirs()
-        file.writeText(text)
-    }
-}
-
-val portableZip by tasks.registering(Zip::class) {
-    dependsOn(tasks.named("jlink"), portableLauncher)
-    archiveFileName.set("AngelsCare-$packagingVariant.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
-    val topLevel = "AngelsCare-$packagingVariant"
-    from(layout.buildDirectory.dir("image")) { into("$topLevel/image") }
-    from(portableLauncher) { into(topLevel) }
-}
-

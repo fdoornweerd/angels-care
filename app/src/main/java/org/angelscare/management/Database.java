@@ -1,23 +1,69 @@
 package org.angelscare.management;
 
 import java.io.File;
-import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
-import java.util.Properties;
 
+/**
+ * The application's local SQLite database.
+ *
+ * <h2>Where the database lives</h2>
+ *
+ * There is no server and no shared database. Every machine gets its own file, created on first
+ * launch inside a folder named {@code AngelsCareData} in the current user's home directory:
+ *
+ * <pre>
+ *   macOS (development)   /Users/&lt;you&gt;/AngelsCareData/angels-care.db
+ *   Windows (deployed)    C:\Users\&lt;name&gt;\AngelsCareData\angels-care.db
+ * </pre>
+ *
+ * The path is derived from the {@code user.home} system property, so it is correct on both without
+ * any per-platform branching. Two consequences worth remembering:
+ *
+ * <ul>
+ *   <li>Data does <em>not</em> travel with the installer. Each person's database starts empty, and
+ *       nothing one user enters is visible to another.</li>
+ *   <li>Uninstalling the application does not delete the database. The folder is deliberately
+ *       outside the install directory so that reinstalling or upgrading never destroys data.</li>
+ * </ul>
+ *
+ * <h2>Why the two machines behave differently</h2>
+ *
+ * The Java code is identical on both, but it runs in two quite different environments:
+ *
+ * <table border="1">
+ *   <caption>Runtime differences</caption>
+ *   <tr><th></th><th>Mac (development)</th><th>Windows (deployed)</th></tr>
+ *   <tr><td>Started by</td><td>{@code ./gradlew run}</td><td>Desktop shortcut from the installer</td></tr>
+ *   <tr><td>JVM</td><td>Your installed JDK 21</td><td>A trimmed JVM bundled inside the app by jlink</td></tr>
+ *   <tr><td>sqlite-jdbc is</td><td>A jar on the module path</td><td>A module baked into the runtime image</td></tr>
+ *   <tr><td>Native library</td><td>{@code libsqlitejdbc.dylib} (Mac/aarch64)</td><td>{@code sqlitejdbc.dll} (Windows/x86_64)</td></tr>
+ * </table>
+ *
+ * That last row is the part that catches people out. sqlite-jdbc is not pure Java: it carries a
+ * compiled binary for every platform inside its jar and, on the first connection, unpacks the one
+ * matching the current OS to disk before loading it. The unpacking is where a working Mac build and
+ * a failing Windows build diverge, which is what the {@code static} block below is about.
+ */
 public class Database {
 
     private static final String DB_URL = "jdbc:sqlite:" + getDbPath();
 
     static {
-        // sqlite-jdbc unpacks a native .dll out of its jar at first use. The default target is
-        // java.io.tmpdir, which on a locked-down or antivirus-guarded Windows profile is often
-        // not writable/executable - and the resulting failure surfaces only as the misleading
-        // "No suitable driver found". Point it at a directory we know we can write to.
+        // By default sqlite-jdbc unpacks its native library into java.io.tmpdir. On Windows that is
+        // a per-user temp folder that antivirus software and locked-down machines routinely block
+        // from holding an executable, and the failure is close to invisible: DriverManager loads
+        // JDBC drivers inside a `catch (Throwable) { }`, so the driver is silently never registered
+        // and the only symptom is "No suitable driver found" - a message that points at the URL
+        // rather than at the real problem.
+        //
+        // Unpacking into the application's own data folder instead avoids depending on the temp
+        // directory at all. This is cheap insurance: it was added while diagnosing exactly that
+        // symptom on a Windows laptop, alongside the installer fix that turned out to be the main
+        // cause, so it has never been proven to be load-bearing on its own. It is kept because the
+        // failure it prevents is silent and expensive to diagnose remotely.
         try {
             File nativeDir = new File(Diagnostics.appDataDir(), "native");
             if (!nativeDir.exists()) {
@@ -25,144 +71,44 @@ public class Database {
             }
             System.setProperty("org.sqlite.tmpdir", nativeDir.getAbsolutePath());
         } catch (Throwable t) {
-            Diagnostics.log("Could not set org.sqlite.tmpdir", t);
+            Diagnostics.log("Could not redirect org.sqlite.tmpdir", t);
         }
-        // NOTE: deliberately no Class.forName() that rethrows here. A throwing static
-        // initializer turns a recoverable database problem into an ExceptionInInitializerError
-        // that kills the window before it is ever shown.
+        // Nothing in this block may throw. A static initializer that throws becomes an
+        // ExceptionInInitializerError on the first touch of this class - which happens inside
+        // Main.start(), before the window is shown - so a recoverable database problem would take
+        // the whole application down with no window and no error message.
     }
 
     private static String getDbPath() {
-        File appDataDir = Diagnostics.appDataDir();
-        return new File(appDataDir, "angels-care.db").getAbsolutePath();
-    }
-
-    public static String dbUrl() {
-        return DB_URL;
+        return new File(Diagnostics.appDataDir(), "angels-care.db").getAbsolutePath();
     }
 
     /**
-     * Tries every way we know of to get a SQLite connection and reports what happened.
-     * Never throws.
+     * Opens the database, making sure the schema exists, and reports what happened.
+     * Returns a human-readable message rather than throwing, so the caller can always show it.
      */
     public static String testConnection() {
-        Diagnostics.log("Database URL: " + DB_URL);
-        Diagnostics.log("sqlite driver class present: " + driverClassStatus());
-        Diagnostics.log("sqlite native library in image: " + nativeLibraryStatus());
-        Diagnostics.log("drivers registered with DriverManager: " + registeredDrivers());
+        Diagnostics.log("Opening database: " + DB_URL);
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement()) {
 
-        Throwable last = null;
-
-        // 1. The normal route: DriverManager finds the driver through ServiceLoader.
-        try {
-            return runProbe(DriverManager.getConnection(DB_URL), "DriverManager (ServiceLoader)");
-        } catch (Throwable t) {
-            last = t;
-            Diagnostics.log("Strategy 1 (DriverManager) failed", t);
-        }
-
-        // 2. Load the driver class explicitly, register it, retry DriverManager.
-        try {
-            Driver driver = newDriver();
-            DriverManager.registerDriver(driver);
-            Diagnostics.log("Registered " + driver.getClass().getName() + " manually");
-            return runProbe(DriverManager.getConnection(DB_URL), "DriverManager after manual registration");
-        } catch (Throwable t) {
-            last = t;
-            Diagnostics.log("Strategy 2 (manual registration) failed", t);
-        }
-
-        // 3. Skip DriverManager entirely and ask the driver for a connection directly.
-        try {
-            Driver driver = newDriver();
-            Connection conn = driver.connect(DB_URL, new Properties());
-            if (conn == null) {
-                throw new IllegalStateException("driver.connect() returned null for " + DB_URL);
-            }
-            return runProbe(conn, "org.sqlite.JDBC.connect() direct");
-        } catch (Throwable t) {
-            last = t;
-            Diagnostics.log("Strategy 3 (direct driver.connect) failed", t);
-        }
-
-        // 4. SQLiteDataSource - a different code path again inside sqlite-jdbc.
-        try {
-            Class<?> dsClass = Class.forName("org.sqlite.SQLiteDataSource");
-            Object ds = dsClass.getConstructor().newInstance();
-            dsClass.getMethod("setUrl", String.class).invoke(ds, DB_URL);
-            Connection conn = (Connection) dsClass.getMethod("getConnection").invoke(ds);
-            return runProbe(conn, "SQLiteDataSource");
-        } catch (Throwable t) {
-            last = t;
-            Diagnostics.log("Strategy 4 (SQLiteDataSource) failed", t);
-        }
-
-        return "SQLite connection FAILED (all 4 strategies).\n"
-                + "Last error: " + Diagnostics.describe(last) + "\n"
-                + "Database file: " + DB_URL;
-    }
-
-    private static Driver newDriver() throws Exception {
-        Class<?> cls = Class.forName("org.sqlite.JDBC");
-        return (Driver) cls.getConstructor().newInstance();
-    }
-
-    private static String runProbe(Connection conn, String how) throws Exception {
-        try (Connection c = conn; Statement stmt = c.createStatement()) {
             stmt.execute("CREATE TABLE IF NOT EXISTS students (id INTEGER PRIMARY KEY, name TEXT)");
             stmt.execute("INSERT INTO students (name) VALUES ('Test Student')");
+
             try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS count FROM students")) {
                 rs.next();
                 int count = rs.getInt("count");
-                Diagnostics.log("Connected via " + how + "; rows = " + count);
-                return "SQLite connected via " + how + ".\n"
-                        + "Rows in students table: " + count + "\n\nSUCCESS!";
+                Diagnostics.log("Connected; rows in students = " + count);
+                return "SQLite connected.\nRows in students table: " + count + "\n\nSUCCESS!";
             }
-        }
-    }
-
-    private static String driverClassStatus() {
-        try {
-            Class<?> cls = Class.forName("org.sqlite.JDBC");
-            return "yes (module=" + cls.getModule().getName() + ")";
         } catch (Throwable t) {
-            return "NO -> " + Diagnostics.describe(t);
-        }
-    }
-
-    /**
-     * sqlite-jdbc ships its Windows .dll as a resource inside the jar. jlink/jpackage can drop or
-     * encapsulate that resource, which is one of the ways this breaks only in the packaged build.
-     */
-    private static String nativeLibraryStatus() {
-        String resource = "org/sqlite/native/Windows/x86_64/sqlitejdbc.dll";
-        try {
-            Class<?> cls = Class.forName("org.sqlite.JDBC");
-            try (InputStream in = cls.getModule().getResourceAsStream(resource)) {
-                if (in != null) {
-                    return "found " + resource;
-                }
-            }
-            try (InputStream in = cls.getClassLoader().getResourceAsStream(resource)) {
-                if (in != null) {
-                    return "found (via classloader) " + resource;
-                }
-            }
-            // A named module can encapsulate resources, so "not visible" is not proof of "absent" -
-            // but combined with the strategy failures below it points straight at the packaging.
-            return "NOT VISIBLE: " + resource + " (missing from the runtime image, or encapsulated)";
-        } catch (Throwable t) {
-            return "could not check -> " + Diagnostics.describe(t);
-        }
-    }
-
-    private static String registeredDrivers() {
-        try {
-            StringBuilder sb = new StringBuilder();
-            DriverManager.drivers().forEach(d -> sb.append(d.getClass().getName()).append(' '));
-            return sb.length() == 0 ? "(none)" : sb.toString().trim();
-        } catch (Throwable t) {
-            return "could not list -> " + Diagnostics.describe(t);
+            // Throwable, not SQLException: if the native library cannot be loaded the failure
+            // arrives as an UnsatisfiedLinkError or ExceptionInInitializerError, neither of which
+            // is an SQLException. Catching only SQLException would let those escape unreported.
+            Diagnostics.log("Database connection failed", t);
+            return "SQLite connection FAILED.\n"
+                    + Diagnostics.describe(t) + "\n\n"
+                    + "Database file: " + DB_URL;
         }
     }
 }

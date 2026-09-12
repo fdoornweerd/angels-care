@@ -9,26 +9,6 @@ jobs:
   build:
     runs-on: windows-latest
 
-    strategy:
-      # One broken variant must not stop the others from producing a downloadable build.
-      fail-fast: false
-      matrix:
-        include:
-          # Unzip-and-run. No installer, no admin rights, nothing to go wrong at install time.
-          - variant: portable
-            task: portableZip
-          # Same, but from an unstripped runtime image with --bind-services.
-          - variant: portable-nostrip
-            task: portableZip
-          # .exe installer that installs per-user and actually creates shortcuts.
-          - variant: installer
-            task: jpackage
-          # Same installer, but the app runs with a console window so errors stay on screen.
-          - variant: installer-console
-            task: jpackage
-
-    name: ${{ matrix.variant }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,16 +19,12 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Build ${{ matrix.variant }}
-        run: ./gradlew ${{ matrix.task }} -PpackagingVariant=${{ matrix.variant }} --stacktrace
+      - name: Build installer
+        run: ./gradlew jpackage --stacktrace
 
-      - name: Upload ${{ matrix.variant }}
+      - name: Upload installer
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: angels-care-${{ matrix.variant }}
+          name: angels-care-windows-installer
           if-no-files-found: error
-          path: |
-            app/build/distributions/AngelsCare-${{ matrix.variant }}.zip
-            app/build/jpackage/*.exe
-            app/build/jpackage/AngelsCare/**
+          path: app/build/jpackage/*.exe
