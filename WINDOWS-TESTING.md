@@ -27,3 +27,55 @@ back** — it records the Java version, the paths, whether the SQLite driver cla
 native library is present in the image, and the full stack trace of each failed connection attempt.
 
 The same text is also shown inside the app window, so a screenshot works too.
+
+---
+
+# Cleaning up once a variant works
+
+The whole point of the four variants is to be thrown away. The startup log names the answer
+directly - look for the line beginning `Connected via`, e.g.:
+
+```
+Connected via DriverManager (ServiceLoader); rows = 3
+```
+
+## Step 1: collapse the packaging
+
+In `app/build.gradle.kts`, `packagingVariant` drives everything. Delete the branching and keep only
+what the working variant used:
+
+| Variant that worked | What that proves | What to keep |
+|---|---|---|
+| `portable` | The runtime image was always fine; the **installer** was the problem | Keep the default `jlinkOptions` (stripped). Keep the `installerOptions` block - `--win-shortcut` / `--win-menu` were the missing piece. Delete the `nostrip` branch. |
+| `portable-nostrip` but not `portable` | `--strip-debug` / `--compress 2` were breaking the image | Make `listOf("--bind-services")` the only `jlinkOptions`. Delete the stripped branch. |
+| `installer` | Shortcuts + per-user install were the fix | Hardcode `installerOptions`, delete `packagingVariant`, `wantsConsole` and `wantsStrippedImage`. |
+| `installer-console` but not `installer` | Something still fails, and only the console reveals it | Do **not** clean up yet - read the console output first. |
+
+Then drop the matrix in `.github/workflows/build-windows.yml` back to a single job with the one
+task, and delete this file.
+
+## Step 2: collapse the database code
+
+`Database.testConnection()` tries four strategies so that one of them survives. Once the log says
+which one connects, delete the other three and keep that single code path. Specifically:
+
+- **Strategy 1 (`DriverManager`)** won - delete strategies 2-4 and the `newDriver()` helper. The
+  original code was correct; the packaging was the bug.
+- **Strategy 2, 3 or 4** won - keep that one as the only implementation. It means `ServiceLoader`
+  driver discovery does not survive this packaging, so the explicit path is permanent, not a
+  workaround to remove later.
+
+Keep in all cases, regardless of which strategy won:
+
+- the `org.sqlite.tmpdir` redirect in the `static` block (unpacking the native `.dll` into the app's
+  own directory instead of the system temp dir)
+- `catch (Throwable ...)` rather than `catch (SQLException ...)`, so an `UnsatisfiedLinkError` is
+  reported instead of vanishing
+- **no** rethrowing `static` initializer - that is what turned a database error into a blank screen
+
+## Step 3: decide about the logging
+
+`Diagnostics` and the error-reporting window in `Main` are independent of the fix. Worth keeping
+while the app is still being handed to other people's machines; the log file is the difference
+between "it doesn't work" and a diagnosis. Trim `logEnvironment()` down, or delete the class and
+restore the simple `Label`, once the app is stable.
