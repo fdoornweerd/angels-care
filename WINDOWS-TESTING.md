@@ -11,6 +11,24 @@ source, each packaged differently. Run it from the Actions tab ("Build Windows I
 | `angels-care-installer` | `.exe` installer, per-user, creates shortcuts | Run it, then use the **desktop icon** or Start menu -> Angels Care |
 | `angels-care-installer-console` | Same installer, app runs with a console window attached | Same, but a black console window stays open showing any error |
 
+Both `installer` artifacts also contain an **`AngelsCare\` folder** alongside the installer `.exe`.
+That folder is the app image: a real `AngelsCare.exe` that runs in place, with nothing to install.
+It is the same program the installer would have installed, so it is worth trying on its own.
+
+## The three things jpackage and jlink produce
+
+They are a chain, and only the last one is an installer:
+
+1. **jlink image** (`jlinkZip` -> `AngelsCare-portable.zip`) - a stripped-down JVM plus the app's
+   modules, in a plain folder. Started by `bin\AngelsCare.bat`. No Windows integration whatsoever.
+2. **app image** (`jpackageImage` -> `build/jpackage/AngelsCare/`) - the same folder, but with a real
+   `AngelsCare.exe` launcher in place of the `.bat`. Still nothing to install.
+3. **installer** (`jpackage` -> `build/jpackage/AngelsCare-*.exe`) - wraps the app image in a
+   Windows installer that copies it into place, writes registry entries, creates the shortcuts and
+   registers an uninstaller.
+
+The `.exe` that kept flashing and disappearing was #3. Running an installer is not running the app.
+
 **Try `portable` first.** It removes the installer, UAC, Program Files and the Start menu from the
 equation entirely, so if it works we know the problem was packaging, not the code.
 

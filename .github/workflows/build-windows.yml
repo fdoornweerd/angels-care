@@ -51,3 +51,4 @@ jobs:
           path: |
             app/build/distributions/AngelsCare-${{ matrix.variant }}.zip
             app/build/jpackage/*.exe
+            app/build/jpackage/AngelsCare/**
