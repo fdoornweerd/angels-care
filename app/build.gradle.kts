@@ -97,3 +97,44 @@ application {
     mainModule = "org.angelscare.management"
     mainClass = "org.angelscare.management.Main"
 }
+
+// The zip jlink produces has no obvious entry point: the launcher sits at image\bin\AngelsCare.bat,
+// four folders down, next to java.exe and twenty other JDK tools. `portableZip` wraps the same image
+// in a folder with a single launcher at the top level, so extracting and double-clicking is the
+// whole procedure. The launcher also pauses on exit, so a crash leaves its message on screen
+// instead of closing the window instantly.
+val portableLauncherText = """
+@echo off
+title Angels Care
+echo Starting Angels Care...
+echo.
+call "%~dp0image\bin\AngelsCare.bat"
+echo.
+echo Angels Care has closed.
+echo.
+echo If it did not work, send this file back:
+echo    %USERPROFILE%\AngelsCareData\angels-care-startup.log
+echo.
+pause
+""".trimStart().replace("\n", "\r\n")
+
+val portableLauncher by tasks.registering {
+    val launcherFile = layout.buildDirectory.file("portable/Start Angels Care.bat")
+    val text = portableLauncherText
+    outputs.file(launcherFile)
+    doLast {
+        val file = launcherFile.get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(text)
+    }
+}
+
+val portableZip by tasks.registering(Zip::class) {
+    dependsOn(tasks.named("jlink"), portableLauncher)
+    archiveFileName.set("AngelsCare-$packagingVariant.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    val topLevel = "AngelsCare-$packagingVariant"
+    from(layout.buildDirectory.dir("image")) { into("$topLevel/image") }
+    from(portableLauncher) { into(topLevel) }
+}
+

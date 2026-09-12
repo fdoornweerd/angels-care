@@ -6,7 +6,7 @@ source, each packaged differently. Run it from the Actions tab ("Build Windows I
 
 | Artifact | What it is | How to run it |
 |---|---|---|
-| `angels-care-portable` | Zipped runtime image. No installer at all. | Unzip, open `image\bin\`, double-click **`AngelsCare.bat`** |
+| `angels-care-portable` | Zipped runtime image. No installer at all. | Extract the zip, open the folder, double-click **`Start Angels Care`** |
 | `angels-care-portable-nostrip` | Same, built from an unstripped image with `--bind-services` | Same as above |
 | `angels-care-installer` | `.exe` installer, per-user, creates shortcuts | Run it, then use the **desktop icon** or Start menu -> Angels Care |
 | `angels-care-installer-console` | Same installer, app runs with a console window attached | Same, but a black console window stays open showing any error |
@@ -19,8 +19,9 @@ It is the same program the installer would have installed, so it is worth trying
 
 They are a chain, and only the last one is an installer:
 
-1. **jlink image** (`jlinkZip` -> `AngelsCare-portable.zip`) - a stripped-down JVM plus the app's
-   modules, in a plain folder. Started by `bin\AngelsCare.bat`. No Windows integration whatsoever.
+1. **jlink image** (`portableZip` -> `AngelsCare-portable.zip`) - a stripped-down JVM plus the app's
+   modules, in a plain folder. Started by `Start Angels Care.bat` at the top of the extracted folder.
+   No Windows integration whatsoever.
 2. **app image** (`jpackageImage` -> `build/jpackage/AngelsCare/`) - the same folder, but with a real
    `AngelsCare.exe` launcher in place of the `.bat`. Still nothing to install.
 3. **installer** (`jpackage` -> `build/jpackage/AngelsCare-*.exe`) - wraps the app image in a
@@ -31,6 +32,10 @@ The `.exe` that kept flashing and disappearing was #3. Running an installer is n
 
 **Try `portable` first.** It removes the installer, UAC, Program Files and the Start menu from the
 equation entirely, so if it works we know the problem was packaging, not the code.
+
+None of these can be sent as a single loose file except the two installers. The `.bat` launcher and
+the app image's `AngelsCare.exe` are both only a few kilobytes and do nothing without the ~200 MB
+folder of JVM files beside them - they have to travel as the whole zip.
 
 ## Before installing either `.exe`
 
