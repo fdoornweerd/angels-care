@@ -49,6 +49,11 @@ javafx {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        // Full messages and causes in the console, so a CI failure can be read from the log alone.
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        events("failed")
+    }
 }
 
 application {

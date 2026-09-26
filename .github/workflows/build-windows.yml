@@ -25,6 +25,13 @@ jobs:
       - name: Run tests
         run: ./gradlew test --stacktrace
 
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: app/build/reports/tests/test/
+
   installer:
     needs: test
     # PRs are only tested; the installer is built for main and for manual runs.
