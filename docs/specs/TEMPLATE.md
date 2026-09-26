@@ -26,9 +26,6 @@ not just the happy path.
 - **AC-1** Given …, when …, then ….
 - **AC-2** …
 
-## Open decisions
-Genuine forks only, each with a recommendation.
-1. **Question?** Options… *Recommend:* … because ….
 
 ## Out of scope
 What this spec deliberately does not do, so it is not built "while we're here".
