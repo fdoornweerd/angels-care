@@ -78,6 +78,19 @@ class BootstrapTest {
     }
 
     @Test
+    @DisplayName("an org.sqlite.tmpdir that is already set is left alone")
+    void respectsPresetSqliteTmpdir() {
+        // The test task sets it (see build.gradle.kts): on Windows a loaded DLL cannot be deleted,
+        // so unpacking it into a @TempDir makes JUnit's clean-up fail.
+        String preset = System.getProperty("org.sqlite.tmpdir");
+        assertThat(preset).as("set by the Gradle test task").isNotBlank();
+
+        try (ConfigurableApplicationContext context = startOrFail(dataDir)) {
+            assertThat(System.getProperty("org.sqlite.tmpdir")).isEqualTo(preset);
+        }
+    }
+
+    @Test
     @DisplayName("AC-5: an unusable data folder is reported, not thrown, and the cause is logged")
     void unusableDataFolder() throws IOException {
         // A plain file where the data folder should be: no database can be created inside it.

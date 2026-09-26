@@ -50,8 +50,13 @@ public final class Bootstrap {
      * installer fix that turned out to be the main cause, so it has never been proven to be
      * load-bearing on its own. It is kept because the failure it prevents is silent and expensive
      * to diagnose remotely. Must run before the first database connection.
+     *
+     * <p>An {@code org.sqlite.tmpdir} that is already set wins; the tests rely on that.
      */
     private static void redirectSqliteNativeLibrary(Path dataDir) {
+        if (System.getProperty("org.sqlite.tmpdir") != null) {
+            return;
+        }
         try {
             File nativeDir = dataDir.resolve("native").toFile();
             nativeDir.mkdirs();

@@ -54,6 +54,11 @@ tasks.test {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         events("failed")
     }
+    // Unpack sqlite-jdbc's native library somewhere fixed. Left to Bootstrap it lands in each test's
+    // @TempDir, and on Windows a loaded DLL cannot be deleted, so JUnit's clean-up fails.
+    val sqliteNative = layout.buildDirectory.dir("sqlite-native").get().asFile
+    systemProperty("org.sqlite.tmpdir", sqliteNative.absolutePath)
+    doFirst { sqliteNative.mkdirs() }
 }
 
 application {
