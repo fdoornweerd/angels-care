@@ -25,6 +25,10 @@ public record Ugx(long shillings) {
         return new Ugx(Math.subtractExact(shillings, other.shillings));
     }
 
+    public Ugx times(long factor) {
+        return new Ugx(Math.multiplyExact(shillings, factor));
+    }
+
     public boolean isNegative() {
         return shillings < 0;
     }
