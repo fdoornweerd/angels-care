@@ -49,8 +49,14 @@ public final class Diagnostics {
     }
 
     public static synchronized void startLogFile() {
+        startLogFile(appDataDir().toPath());
+    }
+
+    /** Starts the log in {@code dir} instead of the data folder; tests use this to stay out of it. */
+    public static synchronized void startLogFile(Path dir) {
         try {
-            logFile = appDataDir().toPath().resolve("angels-care-startup.log");
+            Files.createDirectories(dir);
+            logFile = dir.resolve("angels-care-startup.log");
             Files.writeString(logFile, "", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             log("=== Angels Care " + LocalDateTime.now() + " ===");

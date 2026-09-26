@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.angelscare.management.shell.ui.MainController"
+      alignment="CENTER" spacing="16">
+    <padding>
+        <Insets top="24" right="24" bottom="24" left="24"/>
+    </padding>
+    <Label text="Angels Care" style="-fx-font-size: 22px; -fx-font-weight: bold;"/>
+    <Label fx:id="status" wrapText="true" textAlignment="CENTER"/>
+</VBox>
