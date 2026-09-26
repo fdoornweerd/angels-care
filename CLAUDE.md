@@ -53,6 +53,10 @@ Package by feature under `org.angelscare.management`, layered inside each featur
   Every read query filters `deleted_at IS NULL`. Every write sets `updated_at`.
 - Business dates (payment date, term dates) are `LocalDate`; timestamps are `Instant` in UTC.
   Display in Africa/Kampala time.
+- Enums are stored as their `name()` in a `TEXT` column with a `CHECK (col IN (...))`.
+- Write through `common/SyncedTable` (stamps, soft delete) and delete through
+  `common/DeletionGuard` (blocks while referenced, found from foreign keys), so every table
+  follows these rules the same way.
 - Schema changes are **only** new Flyway migrations (`src/main/resources/db/migration/V<n>__*.sql`).
   Never edit a migration that has been committed to main; real data depends on it.
 
