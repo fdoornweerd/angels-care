@@ -5,7 +5,7 @@ Desktop finance system for **Angels Care School** in Uganda. Current scope is **
 only**: revenue is student fees; expenses are teacher salaries, supplies, etc. School administration
 (enrolment, attendance, …) comes later: do not build for it yet.
 
-Used by 2–3 staff, each on their own Windows PC, who rarely edit the same records. Each PC has a
+Used by 2–3 staff, each on their own Windows PC (such as HP Lightbook), who rarely edit the same records. Each PC has a
 local SQLite database; syncing with a cloud database is planned (host not chosen yet). Developed
 on macOS; the Windows installer is built by CI. `README.md` covers packaging and deployment.
 
