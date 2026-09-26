@@ -1,6 +1,6 @@
 # Angels Care
 
-A JavaFX desktop application with a local SQLite database. Developed on macOS, deployed to Windows
+A JavaFX + Spring Boot desktop application with a local SQLite database. Developed on macOS, deployed to Windows
 as a native installer.
 
 ---
@@ -23,8 +23,10 @@ The application is distributed as a single installer file. Nothing else needs to
 
 ### Running
 
-Double-click the desktop icon. A window opens reading "Hello, Angels Care!" with the database status
-underneath. On the very first run the database is created, so that run takes slightly longer.
+Double-click the desktop icon. A window opens reading "Angels Care" with "Database OK" underneath.
+If anything goes wrong during start-up, a window titled "Something went wrong" appears instead,
+naming the log file to send (see below). On the very first run the database is created, so that run
+takes slightly longer.
 
 ### Uninstalling
 
@@ -74,8 +76,11 @@ Requires JDK 21. Gradle downloads a matching toolchain automatically if you do n
 ```bash
 ./gradlew run                   # run from source
 ./gradlew test                  # run the tests
-./gradlew jpackage              # build a native package for the machine you are on
+./gradlew jpackageImage         # build AngelsCare.app on the Mac, to check packaging locally
+./gradlew jpackage              # build a native installer for the machine you are on
 ```
+
+New features are written spec-first and test-first: see `CLAUDE.md` and `docs/specs/`.
 
 ### Building the Windows installer
 
@@ -98,7 +103,8 @@ download it yourself and pass the file along.
 
 Three distinct things get built, and only the last is what users receive:
 
-1. **jlink runtime image** — a trimmed-down JVM plus this application's modules, in a folder.
+1. **Runtime image** — a trimmed-down JVM (built by jlink via the `org.beryx.runtime` plugin) plus
+   the application and its libraries, in a folder.
 2. **App image** — the same folder with a real `AngelsCare.exe` launcher. Runs in place; installs
    nothing.
 3. **Installer** (`AngelsCare-1.0.0.exe`) — wraps the app image so it can be copied into place, with
@@ -121,9 +127,19 @@ Two settings in `app/build.gradle.kts` matter more than they look:
 
 ```
 app/src/main/java/org/angelscare/management/
-    Main.java         JavaFX entry point and window
-    Database.java     SQLite connection and schema; documents the Mac/Windows differences
-    Diagnostics.java  start-up logging, for diagnosing failures on machines you cannot access
-    module-info.java  JPMS module declaration (required by jlink)
-.github/workflows/build-windows.yml   builds the Windows installer
+    Launcher.java               entry point; starts the log, then JavaFX
+    FxApp.java                  JavaFX application; shows the main window or an error window
+    Bootstrap.java              starts Spring against the data folder; never throws
+    AngelsCareApplication.java  Spring configuration root
+    Diagnostics.java            start-up logging, for diagnosing failures on machines you cannot access
+    common/                     shared building blocks: Ugx (money), Ids, Clock
+    db/                         SQLite DataSource, device identity
+    shell/ui/                   main window controller
+app/src/main/resources/
+    db/migration/               Flyway migrations (V1__baseline.sql, ...)
+    fxml/                       JavaFX views, one folder per feature
+app/src/test/java/.../support/DatabaseTest.java   base class: a fresh migrated SQLite DB per test
+docs/specs/                     feature specs (TEMPLATE.md + NNN-name.md)
+.claude/                        Claude Code skills (/spec, /tdd), settings, test hook
+.github/workflows/build-windows.yml   runs tests on Windows for PRs; builds the installer on main
 ```

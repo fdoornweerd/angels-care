@@ -6,3 +6,12 @@ build
 
 # Ignore Kotlin plugin data
 .kotlin
+
+# Local SQLite databases - real data never goes in git
+*.db
+*.db-wal
+*.db-shm
+
+# Claude Code per-session state (e.g. the /tdd red-phase marker) and personal settings
+.claude/state/
+.claude/settings.local.json

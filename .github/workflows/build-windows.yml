@@ -4,9 +4,38 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  pull_request:
 
 jobs:
-  build:
+  # On Windows rather than Linux on purpose: it exercises sqlite-jdbc's Windows native library and
+  # Windows file paths on every PR, which is otherwise only tested by a person, a day at a time.
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Run tests
+        run: ./gradlew test --stacktrace
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: app/build/reports/tests/test/
+
+  installer:
+    needs: test
+    # PRs are only tested; the installer is built for main and for manual runs.
+    if: github.event_name != 'pull_request'
     runs-on: windows-latest
 
     steps:
