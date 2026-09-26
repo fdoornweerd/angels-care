@@ -40,6 +40,14 @@ class UgxTest {
     }
 
     @Test
+    void multiplies() {
+        assertThat(Ugx.of(100_000).times(3)).isEqualTo(Ugx.of(300_000));
+        assertThat(Ugx.of(100_000).times(0)).isEqualTo(Ugx.ZERO);
+        assertThatThrownBy(() -> Ugx.of(Long.MAX_VALUE).times(2))
+                .isInstanceOf(ArithmeticException.class);
+    }
+
+    @Test
     void refusesToOverflowSilently() {
         // A wrapped-around long would turn a huge credit into a huge debt without any error.
         assertThatThrownBy(() -> Ugx.of(Long.MAX_VALUE).plus(Ugx.of(1)))
