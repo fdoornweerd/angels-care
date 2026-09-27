@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Page 2: one term's income, expenses and surplus. Clicking a row opens its details. -->
+<ScrollPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="org.angelscare.management.accounts.ui.TermSummaryController"
+            fitToWidth="true" hbarPolicy="NEVER" styleClass="edge-to-edge">
+    <VBox styleClass="page">
+        <HBox spacing="16" alignment="CENTER_LEFT">
+            <Label fx:id="title" styleClass="page-title"/>
+            <HBox fx:id="termTabs" styleClass="term-tabs" spacing="0">
+                <ToggleButton fx:id="term1" text="Term 1" minWidth="-Infinity"/>
+                <ToggleButton fx:id="term2" text="Term 2" minWidth="-Infinity"/>
+                <ToggleButton fx:id="term3" text="Term 3" minWidth="-Infinity"/>
+            </HBox>
+            <Label fx:id="termDates" styleClass="hint"/>
+        </HBox>
+        <HBox spacing="16">
+            <VBox spacing="8" HBox.hgrow="ALWAYS">
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <Label text="Income" styleClass="section-title"/>
+                    <Button text="Detailed incomes" onAction="#detailedIncomes" minWidth="-Infinity"/>
+                </HBox>
+                <TableView fx:id="income"/>
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <Label text="Expenses" styleClass="section-title"/>
+                    <Button text="Detailed expenses" onAction="#detailedExpenses" minWidth="-Infinity"/>
+                </HBox>
+                <TableView fx:id="expenses"/>
+            </VBox>
+            <VBox styleClass="panel" minWidth="300" prefWidth="320" maxHeight="-Infinity">
+                <Label text="Summary" styleClass="section-title"/>
+                <GridPane styleClass="form">
+                    <Label text="Incomes collected" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                    <Label fx:id="collected" styleClass="total" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                    <Label text="Expenditures" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                    <Label fx:id="spent" styleClass="total" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                    <Label fx:id="surplusLabel" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                    <Label fx:id="surplus" styleClass="total" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                </GridPane>
+                <Label styleClass="hint" wrapText="true"
+                       text="Amounts in UGX. Click a row to see and change its details."/>
+            </VBox>
+        </HBox>
+    </VBox>
+</ScrollPane>

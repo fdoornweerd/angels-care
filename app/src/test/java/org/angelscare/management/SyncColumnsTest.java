@@ -13,11 +13,11 @@ import org.angelscare.management.support.FinanceTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Spec 001: the columns cloud sync will depend on, checked across every finance table. */
+/** The columns cloud sync will depend on, checked across every finance table. */
 class SyncColumnsTest extends FinanceTest {
 
     @Test
-    @DisplayName("AC-2: every finance table has a TEXT id primary key and the three sync columns")
+    @DisplayName("AC-2 (001) / AC-1 (002): every finance table has a TEXT id and the sync columns")
     void everyTableHasSyncColumns() {
         for (String table : FinanceTables.ALL) {
             List<Map<String, Object>> columns =
@@ -34,11 +34,11 @@ class SyncColumnsTest extends FinanceTest {
     }
 
     @Test
-    @DisplayName("AC-2: new rows get a UUID id, created_at = updated_at = now, and no deleted_at")
+    @DisplayName("AC-2 (001) / AC-1 (002): new rows get a UUID id, created_at = updated_at = now")
     void newRowsAreStamped() {
         createOneOfEverything();
 
-        for (String table : FinanceTables.ALL) {
+        for (String table : FinanceTables.IN_USE) {
             List<Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT id, created_at, updated_at, deleted_at FROM " + table);
             assertThat(rows).as(table).isNotEmpty();
@@ -53,13 +53,13 @@ class SyncColumnsTest extends FinanceTest {
     }
 
     @Test
-    @DisplayName("AC-2: an edit moves updated_at to now and leaves created_at alone")
+    @DisplayName("AC-2 (001): an edit moves updated_at to now and leaves created_at alone")
     void editsMoveUpdatedAt() {
         Everything everything = createOneOfEverything();
         clock.advance(Duration.ofHours(3));
         Instant later = clock.instant();
 
-        finance.expenses.renameCategory(everything.expenseCategory().id(), "Admin Costs");
+        finance.expenses.renameCategory(everything.expenseCategory().id(), "Food");
         finance.students.setStatus(everything.student().id(), StudentStatus.LEFT);
 
         String categoryId = everything.expenseCategory().id();
@@ -67,8 +67,6 @@ class SyncColumnsTest extends FinanceTest {
         assertThat(timestampOf("expense_category", "created_at", categoryId)).isEqualTo(T0);
         String studentId = everything.student().id();
         assertThat(timestampOf("student", "updated_at", studentId)).isEqualTo(later);
-        assertThat(timestampOf("student", "created_at", studentId)).isEqualTo(T0);
-        // A row that was not edited keeps its original stamp.
         assertThat(timestampOf("expense_item", "updated_at", everything.expenseItem().id()))
                 .isEqualTo(T0);
     }

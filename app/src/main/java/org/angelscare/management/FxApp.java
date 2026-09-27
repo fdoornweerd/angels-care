@@ -47,7 +47,11 @@ public class FxApp extends Application {
         }
 
         stage.setTitle("Angels Care");
-        stage.setScene(new Scene(root, 900, 600));
+        stage.setScene(new Scene(root, 1280, 720));
+        // Designed for a 1366x768 laptop: open maximised, and never so small that pages get cut off.
+        stage.setMinWidth(1024);
+        stage.setMinHeight(600);
+        stage.setMaximized(true);
         stage.show();
         Diagnostics.log("Window shown.");
     }

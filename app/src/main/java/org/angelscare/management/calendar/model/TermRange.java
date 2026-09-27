@@ -20,7 +20,7 @@ public record TermRange(TermRef start, TermRef end) {
         return new TermRange(start, end);
     }
 
-    /** For messages: "from 2026 Term 1 to 2026 Term 3", or "from 2026 Term 1 onwards". */
+    /** For messages: "from 2026-2027 Term 1 to 2026-2027 Term 3", or "… onwards". */
     public String label() {
         return end == null
                 ? "from " + start.label() + " onwards"

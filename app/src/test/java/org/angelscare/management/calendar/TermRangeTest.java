@@ -73,4 +73,13 @@ class TermRangeTest {
         assertThat(TermRange.between(t(2026, 3), t(2027, 1))
                 .overlaps(TermRange.between(t(2025, 1), t(2026, 2)))).isFalse();
     }
+
+    @Test
+    @DisplayName("AC-9 (changed later): terms are labelled with their school year's name")
+    void labels() {
+        assertThat(t(2026, 2).label()).isEqualTo("2026-2027 Term 2");
+        assertThat(TermRange.from(t(2026, 1)).label()).isEqualTo("from 2026-2027 Term 1 onwards");
+        assertThat(TermRange.between(t(2026, 3), t(2027, 1)).label())
+                .isEqualTo("from 2026-2027 Term 3 to 2027-2028 Term 1");
+    }
 }

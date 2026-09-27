@@ -15,9 +15,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class IncomeCategoryRepository {
 
-    private static final String SELECT = "SELECT id, name FROM income_category WHERE " + LIVE;
-    private static final RowMapper<IncomeCategory> MAPPER =
-            (row, n) -> new IncomeCategory(row.getString("id"), row.getString("name"));
+    private static final String SELECT =
+            "SELECT id, school_year_id, name FROM income_category WHERE " + LIVE;
+    private static final RowMapper<IncomeCategory> MAPPER = (row, n) -> new IncomeCategory(
+            row.getString("id"), row.getString("school_year_id"), row.getString("name"));
 
     private final JdbcTemplate jdbc;
     private final SyncedTable table;
@@ -27,8 +28,9 @@ public class IncomeCategoryRepository {
         this.table = new SyncedTable(jdbc, clock, "income_category");
     }
 
-    public IncomeCategory insert(String name) {
-        return findById(table.insert(columns("name", name))).orElseThrow();
+    public IncomeCategory insert(String schoolYearId, String name) {
+        return findById(table.insert(columns("school_year_id", schoolYearId, "name", name)))
+                .orElseThrow();
     }
 
     public void rename(String id, String name) {
@@ -43,12 +45,14 @@ public class IncomeCategoryRepository {
         return jdbc.query(SELECT + " AND id = ?", MAPPER, id).stream().findFirst();
     }
 
-    public List<IncomeCategory> findAll() {
-        return jdbc.query(SELECT + " ORDER BY lower(name)", MAPPER);
+    /** A school year's categories, by name. */
+    public List<IncomeCategory> findByYear(String schoolYearId) {
+        return jdbc.query(SELECT + " AND school_year_id = ? ORDER BY lower(name)", MAPPER,
+                schoolYearId);
     }
 
-    /** The stored name of another live category with this name (any case). */
-    public Optional<String> nameClash(String name, String excludeId) {
-        return table.findClash("name", name, excludeId, null, null);
+    /** The stored name of another live category of the same school year with this name. */
+    public Optional<String> nameClash(String schoolYearId, String name, String excludeId) {
+        return table.findClash("name", name, excludeId, "school_year_id", schoolYearId);
     }
 }

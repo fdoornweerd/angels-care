@@ -18,8 +18,4 @@ public record Student(
     public String fullName() {
         return firstName + " " + lastName;
     }
-
-    public Student withClass(SchoolClass newClass) {
-        return new Student(id, firstName, lastName, admissionNo, newClass, residency, status);
-    }
 }

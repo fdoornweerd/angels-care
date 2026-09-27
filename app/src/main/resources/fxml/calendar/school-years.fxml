@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Page 1: the school years. Clicking a row opens its term summary. -->
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.angelscare.management.calendar.ui.SchoolYearsController" styleClass="page">
+    <HBox spacing="12" alignment="CENTER_LEFT">
+        <Label text="School years" styleClass="page-title"/>
+        <Button text="New school year" onAction="#newYear" minWidth="-Infinity"/>
+    </HBox>
+    <Label fx:id="listError"/>
+    <HBox spacing="16" VBox.vgrow="ALWAYS">
+        <TableView fx:id="table" HBox.hgrow="ALWAYS"/>
+        <VBox fx:id="form" styleClass="panel" minWidth="380" prefWidth="400">
+            <Label fx:id="formTitle" styleClass="section-title"/>
+            <Label fx:id="error"/>
+            <GridPane styleClass="form">
+                <Label text="Starts in" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                <TextField fx:id="startYear" prefColumnCount="6" promptText="e.g. 2026"
+                           GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+                <Label fx:id="yearName" styleClass="section-title" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+                <Label text="Starts" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+                <Label text="Ends" GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+                <Label text="Term 1" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                <DatePicker fx:id="term1Start" prefWidth="140" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+                <DatePicker fx:id="term1End" prefWidth="140" GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+                <Label text="Term 2" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                <DatePicker fx:id="term2Start" prefWidth="140" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+                <DatePicker fx:id="term2End" prefWidth="140" GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+                <Label text="Term 3" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                <DatePicker fx:id="term3Start" prefWidth="140" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+                <DatePicker fx:id="term3End" prefWidth="140" GridPane.rowIndex="4" GridPane.columnIndex="2"/>
+            </GridPane>
+            <CheckBox fx:id="copy" wrapText="true"/>
+            <HBox spacing="8">
+                <Button text="Save" defaultButton="true" onAction="#save" minWidth="-Infinity"/>
+                <Button text="Cancel" cancelButton="true" onAction="#cancel" minWidth="-Infinity"/>
+            </HBox>
+        </VBox>
+    </HBox>
+</VBox>

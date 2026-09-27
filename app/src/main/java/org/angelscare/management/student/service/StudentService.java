@@ -18,13 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudentService {
 
     private final StudentRepository students;
-    private final StudentChangeGuard changeGuard;
     private final DeletionGuard deletionGuard;
 
-    public StudentService(StudentRepository students, StudentChangeGuard changeGuard,
-            DeletionGuard deletionGuard) {
+    public StudentService(StudentRepository students, DeletionGuard deletionGuard) {
         this.students = students;
-        this.changeGuard = changeGuard;
         this.deletionGuard = deletionGuard;
     }
 
@@ -35,11 +32,8 @@ public class StudentService {
     }
 
     public Student update(String studentId, StudentDetails details) {
-        Student existing = require(studentId);
+        require(studentId);
         StudentDetails clean = validate(details, studentId);
-        if (clean.schoolClass() != existing.schoolClass()) {
-            changeGuard.beforeClassChange(existing, clean.schoolClass());
-        }
         students.update(studentId, clean);
         return require(studentId);
     }
