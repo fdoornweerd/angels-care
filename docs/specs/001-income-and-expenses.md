@@ -255,6 +255,28 @@ Service-level tests on a temp DB (`DatabaseTest`) with a fixed `Clock`.
    student returns).
 4. **Annual budget total**: not computed in 001; decided in the actual-expenses spec (003).
 
+## Changed later
+**2026-09-26 (Finn): school years may run across two calendar years**, e.g. September 2026 to
+July 2027. This replaces the rule above that every term date falls within one calendar year
+(Behaviour › School calendar, AC-8).
+- A school year is still stored and entered by its **start year** (`school_year.year`; no schema
+  change), and is **always named "2026-2027"**. Terms are "2026-2027 Term 2" in every message.
+- **Dates:** Term 1 must start in the start year, and no date may be after 31 December of the
+  following year. Terms stay in order.
+- **No overlap between school years:** a year must end before the next one's Term 1 starts, when
+  created and when its term dates are edited.
+- **All three terms' dates can be edited in one go** (`CalendarService.updateTermDates(year, t1,
+  t2, t3)`), so terms can move past each other's old dates.
+- Tests are in `CalendarServiceTest` and `TermRangeTest`, marked "changed later".
+
+**Spec 002 (term accounts, 2026-09-27)** changed this spec further:
+- Income and expense **categories belong to a school year** (V3); items have a **unit**.
+- **Groups, memberships, fee assignments (and the no-overlap rule) and the monthly budgets per
+  item per year were removed** from the code. Their tables (`student_group`, `group_membership`,
+  `fee_assignment`, `expense_budget`) stay in the schema, unused. Fees are now per class per term
+  on the students page, with a student's own amount where needed.
+- `CalendarService.defaultTerm` is kept.
+
 ## Found during implementation
 - **Terms are passed as `TermRef` ("2026, Term 2"), not as ids.** Services resolve them through
   `CalendarService.requireTerm`, which gives the AC-15 message ("No school year has been set up

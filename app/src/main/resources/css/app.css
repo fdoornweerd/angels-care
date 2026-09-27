@@ -1,0 +1,112 @@
+/* Angels Care: one stylesheet for every page. Designed for a 1366x768 laptop. */
+
+.root {
+    -fx-font-size: 13px;
+}
+
+.top-bar {
+    -fx-background-color: #23395d;
+    -fx-padding: 8 16 8 16;
+    -fx-spacing: 12;
+    -fx-alignment: center-left;
+}
+
+.top-bar .app-title {
+    -fx-text-fill: white;
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+}
+
+.top-bar .breadcrumb {
+    -fx-text-fill: #d8e1ef;
+    -fx-font-size: 14px;
+}
+
+.footer {
+    -fx-padding: 4 12 4 12;
+    -fx-background-color: #eef1f5;
+    -fx-text-fill: #555;
+    -fx-font-size: 11px;
+}
+
+.page {
+    -fx-padding: 16;
+    -fx-spacing: 12;
+}
+
+.page-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+
+.section-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+}
+
+.level-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0 0 0;
+}
+
+.form {
+    -fx-hgap: 8;
+    -fx-vgap: 8;
+}
+
+.panel {
+    -fx-background-color: white;
+    -fx-border-color: #d5dbe3;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 12;
+    -fx-spacing: 8;
+}
+
+.error-message {
+    -fx-text-fill: #b00020;
+    -fx-font-weight: bold;
+}
+
+.hint {
+    -fx-text-fill: #777;
+}
+
+.invalid {
+    -fx-border-color: #b00020;
+    -fx-border-width: 2;
+}
+
+.total {
+    -fx-font-weight: bold;
+}
+
+.totals-row .table-cell {
+    -fx-font-weight: bold;
+}
+
+.totals-row {
+    -fx-background-color: #eef1f5;
+}
+
+.clickable-row:hover {
+    -fx-background-color: #e3ecf8;
+    -fx-cursor: hand;
+}
+
+.table-view .table-cell {
+    -fx-alignment: center-left;
+}
+
+.cell-field {
+    -fx-padding: 2 4 2 4;
+}
+
+.deficit {
+    -fx-text-fill: #b00020;
+}
+
+.term-tabs .toggle-button {
+    -fx-padding: 6 18 6 18;
+}

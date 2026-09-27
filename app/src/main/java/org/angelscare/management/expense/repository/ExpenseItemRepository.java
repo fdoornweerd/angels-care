@@ -15,9 +15,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ExpenseItemRepository {
 
-    private static final String SELECT = "SELECT id, category_id, name FROM expense_item WHERE " + LIVE;
+    private static final String SELECT =
+            "SELECT id, category_id, name, unit FROM expense_item WHERE " + LIVE;
     private static final RowMapper<ExpenseItem> MAPPER = (row, n) -> new ExpenseItem(
-            row.getString("id"), row.getString("category_id"), row.getString("name"));
+            row.getString("id"), row.getString("category_id"), row.getString("name"),
+            row.getString("unit"));
 
     private final JdbcTemplate jdbc;
     private final SyncedTable table;
@@ -27,12 +29,13 @@ public class ExpenseItemRepository {
         this.table = new SyncedTable(jdbc, clock, "expense_item");
     }
 
-    public ExpenseItem insert(String categoryId, String name) {
-        return findById(table.insert(columns("category_id", categoryId, "name", name))).orElseThrow();
+    public ExpenseItem insert(String categoryId, String name, String unit) {
+        return findById(table.insert(columns("category_id", categoryId, "name", name, "unit", unit)))
+                .orElseThrow();
     }
 
-    public void rename(String id, String name) {
-        table.update(id, columns("name", name));
+    public void update(String id, String name, String unit) {
+        table.update(id, columns("name", name, "unit", unit));
     }
 
     public void softDelete(String id) {

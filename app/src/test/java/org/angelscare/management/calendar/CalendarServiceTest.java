@@ -78,9 +78,12 @@ class CalendarServiceTest extends FinanceTest {
                 Arguments.of("term 1 starts in the previous year",
                         d("2025-12-30", "2026-04-24"), d("2026-05-18", "2026-08-14"),
                         d("2026-09-07", "2026-12-04")),
-                Arguments.of("term 3 ends in the next year",
-                        d("2026-02-02", "2026-04-24"), d("2026-05-18", "2026-08-14"),
-                        d("2026-09-07", "2027-01-05")),
+                Arguments.of("term 3 ends after the end of the following year",
+                        d("2026-09-07", "2026-12-04"), d("2027-01-11", "2027-04-02"),
+                        d("2027-04-26", "2028-01-05")),
+                Arguments.of("term 1 starts in the following year",
+                        d("2027-01-11", "2027-04-02"), d("2027-04-26", "2027-07-30"),
+                        d("2027-09-06", "2027-12-03")),
                 Arguments.of("a date is missing",
                         d("2026-02-02", "2026-04-24"), new TermDates(LocalDate.parse("2026-05-18"), null),
                         d("2026-09-07", "2026-12-04")));
@@ -165,6 +168,124 @@ class CalendarServiceTest extends FinanceTest {
         assertThat(finance.calendar.listYears()).isEmpty();
         // The year can be set up again from scratch.
         assertThat(createYear(2026).id()).isNotEqualTo(year.id());
+    }
+
+    @Test
+    @DisplayName("changed later: all three terms can be moved in one edit")
+    void movesAllTermsAtOnce() {
+        createYear(2026);
+
+        // Every term moves a month later. Moved one at a time, Term 1 would first overlap the old Term 2.
+        SchoolYear moved = finance.calendar.updateTermDates(2026,
+                dates("2026-03-02", "2026-05-22"),
+                dates("2026-06-15", "2026-09-11"),
+                dates("2026-10-05", "2026-12-18"));
+
+        assertThat(moved.terms()).extracting(Term::dates).containsExactly(
+                dates("2026-03-02", "2026-05-22"),
+                dates("2026-06-15", "2026-09-11"),
+                dates("2026-10-05", "2026-12-18"));
+        assertThat(finance.calendar.requireTerm(t(2026, 3)).dates())
+                .isEqualTo(dates("2026-10-05", "2026-12-18"));
+    }
+
+    @Test
+    @DisplayName("changed later: an invalid three-term edit changes none of them")
+    void invalidThreeTermEdit() {
+        createYear(2026);
+
+        assertThatThrownBy(() -> finance.calendar.updateTermDates(2026,
+                dates("2026-03-02", "2026-05-22"),
+                dates("2026-05-01", "2026-09-11"),
+                dates("2026-10-05", "2026-12-18")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("Term 2 must start after Term 1 ends.");
+        assertThat(finance.calendar.requireTerm(t(2026, 1)).dates())
+                .isEqualTo(dates("2026-02-02", "2026-04-24"));
+    }
+
+    @Test
+    @DisplayName("AC-8 (changed later): a school year may run into the next calendar year")
+    void spansTwoCalendarYears() {
+        SchoolYear year = createSpanningYear(2026);
+
+        assertThat(year.year()).isEqualTo(2026);
+        assertThat(year.label()).isEqualTo("2026-2027");
+        assertThat(year.terms().get(2).dates()).isEqualTo(dates("2027-04-26", "2027-07-30"));
+        assertThat(finance.calendar.requireTerm(t(2026, 2)).dates().start())
+                .isEqualTo(LocalDate.of(2027, 1, 11));
+    }
+
+    @Test
+    @DisplayName("AC-8 (changed later): the last possible day is 31 December of the following year")
+    void latestEnd() {
+        SchoolYear year = finance.calendar.createYear(2026,
+                dates("2026-12-01", "2026-12-31"), dates("2027-01-01", "2027-06-30"),
+                dates("2027-07-01", "2027-12-31"));
+
+        assertThat(year.terms()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("AC-8 (changed later): consecutive school years may follow each other directly")
+    void consecutiveYears() {
+        createSpanningYear(2026);
+
+        SchoolYear next = createSpanningYear(2027);
+
+        assertThat(finance.calendar.listYears()).extracting(SchoolYear::label)
+                .containsExactly("2026-2027", "2027-2028");
+        assertThat(next.terms().get(0).dates().start()).isEqualTo(LocalDate.of(2027, 9, 7));
+    }
+
+    @Test
+    @DisplayName("AC-8 (changed later): a school year may not overlap the one before it")
+    void overlapWithPreviousYear() {
+        createSpanningYear(2026);
+
+        // Term 1 of 2027-2028 would start before 2026-2027's Term 3 (ends 30/07/2027) is over.
+        assertThatThrownBy(() -> finance.calendar.createYear(2027,
+                dates("2027-07-15", "2027-12-03"), dates("2028-01-10", "2028-03-31"),
+                dates("2028-04-24", "2028-07-28")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("2027-2028's Term 1 must start after 2026-2027's Term 3 ends.");
+        assertThat(finance.calendar.findYear(2027)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AC-8 (changed later): a school year may not overlap the one after it")
+    void overlapWithNextYear() {
+        createSpanningYear(2027);
+
+        assertThatThrownBy(() -> finance.calendar.createYear(2026,
+                dates("2026-09-07", "2026-12-04"), dates("2027-01-11", "2027-04-02"),
+                dates("2027-04-26", "2027-09-10")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("2026-2027's Term 3 must end before 2027-2028's Term 1 starts.");
+    }
+
+    @Test
+    @DisplayName("AC-8 (changed later): editing term dates is checked against the neighbouring years too")
+    void editOverlapsNeighbour() {
+        createSpanningYear(2026);
+        createSpanningYear(2027);
+
+        assertThatThrownBy(() -> finance.calendar.updateTermDates(t(2026, 3),
+                dates("2027-04-26", "2027-09-10")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessage("2026-2027's Term 3 must end before 2027-2028's Term 1 starts.");
+        assertThat(finance.calendar.requireTerm(t(2026, 3)).dates().end())
+                .isEqualTo(LocalDate.of(2027, 7, 30));
+    }
+
+    @Test
+    @DisplayName("AC-7/AC-15 (changed later): messages name school years as 2026-2027")
+    void messagesUseTheYearName() {
+        createYear(2026);
+
+        assertThatThrownBy(() -> createYear(2026)).hasMessage("School year 2026-2027 already exists.");
+        assertThatThrownBy(() -> finance.calendar.requireTerm(t(2027, 1)))
+                .hasMessage("School year 2027-2028 has not been set up yet.");
     }
 
     private static TermDates d(String start, String end) {

@@ -3,8 +3,8 @@ package org.angelscare.management.calendar.model;
 import java.util.Comparator;
 
 /**
- * Names a term the way the school does: "2026, Term 2". Ordered across years, so 2026 Term 3
- * comes before 2027 Term 1.
+ * Names a term: Term {@code number} of the school year that starts in {@code year}. Ordered across
+ * years, so 2026-2027 Term 3 comes before 2027-2028 Term 1.
  */
 public record TermRef(int year, int number) implements Comparable<TermRef> {
 
@@ -20,8 +20,8 @@ public record TermRef(int year, int number) implements Comparable<TermRef> {
         return ORDER.compare(this, other);
     }
 
-    /** For messages: "2026 Term 2". */
+    /** For screens and messages: "2026-2027 Term 2". */
     public String label() {
-        return year + " Term " + number;
+        return SchoolYear.label(year) + " Term " + number;
     }
 }

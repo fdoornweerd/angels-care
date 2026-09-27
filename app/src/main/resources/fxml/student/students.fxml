@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Page 5: the students of the chosen term, one table per class. -->
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.angelscare.management.student.ui.StudentsController" styleClass="page">
+    <HBox spacing="16" alignment="CENTER_LEFT">
+        <Label fx:id="title" text="Students" styleClass="page-title"/>
+        <CheckBox fx:id="showLeft" text="Show students who left"/>
+        <Label fx:id="pageTotals" styleClass="total"/>
+    </HBox>
+    <Label fx:id="error"/>
+    <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" styleClass="edge-to-edge">
+        <VBox fx:id="sections" spacing="12" style="-fx-padding: 0 4 16 0;"/>
+    </ScrollPane>
+</VBox>
