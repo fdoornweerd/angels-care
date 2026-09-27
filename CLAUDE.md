@@ -39,6 +39,8 @@ Package by feature under `org.angelscare.management`, layered inside each featur
 - Dependencies point downward only: ui → service → repository. Services never touch JavaFX; that
   keeps them unit-testable without a UI thread.
 - Shared code (money, clock, IDs) goes in `common/`; nothing feature-specific goes there.
+- Page logic goes in view models under `<feature>/ui/` (plain Java + JavaFX properties), tested
+  without a UI thread; FXML controllers only bind. Pages are opened through `shell/ui/Navigator`.
 
 ## Rules that must not be broken
 **Money**
