@@ -12,7 +12,7 @@ The application is distributed as a single installer file. Nothing else needs to
 
 ### Installing
 
-1. Download `AngelsCare-1.0.0.exe`.
+1. Download the installer, e.g. `AngelsCare-1.0.57.exe` (the last number goes up with every build).
 2. Double-click it. Windows will probably show a blue box reading **"Windows protected your PC"**.
    Click **More info**, then **Run anyway**. This appears because the installer is not code-signed,
    not because anything is wrong with it.
@@ -23,10 +23,18 @@ The application is distributed as a single installer file. Nothing else needs to
 
 ### Running
 
-Double-click the desktop icon. A window opens reading "Angels Care" with "Database OK" underneath.
+Double-click the desktop icon. The window opens on the list of school years; its footer shows the
+version, e.g. "Version 1.0.57".
 If anything goes wrong during start-up, a window titled "Something went wrong" appears instead,
 naming the log file to send (see below). On the very first run the database is created, so that run
 takes slightly longer.
+
+### Updating to a new version
+
+Run the new installer the same way. It replaces the program and keeps your data: the database is
+not part of the installation (see [Where your data lives](#where-your-data-lives)), and the new
+version brings it up to date the first time it starts. An installer is only accepted as an update
+if its version is higher than the one installed.
 
 ### Uninstalling
 
@@ -91,8 +99,9 @@ platform it runs on. It is built by GitHub Actions instead:
 2. Wait for the run to finish (roughly 5–10 minutes).
 3. Open the run and download the **`angels-care-windows-installer`** artifact from the Artifacts box
    at the bottom.
-4. GitHub wraps artifacts in a zip, so unzip it once to get `AngelsCare-1.0.0.exe`. That `.exe` is
-   the file to send to users.
+4. GitHub wraps artifacts in a zip, so unzip it once to get `AngelsCare-1.0.<run>.exe`, where
+   `<run>` is the workflow run's number. That `.exe` is the file to send to users. Builds made on
+   your own machine are always `1.0.0`, lower than any CI build, so don't send those.
 
 Artifact downloads require repository access, so to give the installer to someone outside the repo,
 download it yourself and pass the file along.
@@ -107,7 +116,7 @@ Three distinct things get built, and only the last is what users receive:
    the application and its libraries, in a folder.
 2. **App image** — the same folder with a real `AngelsCare.exe` launcher. Runs in place; installs
    nothing.
-3. **Installer** (`AngelsCare-1.0.0.exe`) — wraps the app image so it can be copied into place, with
+3. **Installer** (`AngelsCare-1.0.<run>.exe`) — wraps the app image so it can be copied into place, with
    shortcuts and an uninstaller registered.
 
 Only #3 is distributed. Note that running the installer is not the same as running the application:
