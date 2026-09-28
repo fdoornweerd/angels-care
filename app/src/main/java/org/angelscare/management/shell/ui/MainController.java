@@ -10,6 +10,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.StackPane;
+import org.angelscare.management.AppVersion;
 import org.angelscare.management.Diagnostics;
 import org.angelscare.management.accounts.model.Ledger;
 import org.angelscare.management.accounts.ui.DetailController;
@@ -62,8 +63,8 @@ public class MainController {
 
     @FXML
     void initialize() {
-        footer.setText("Data folder: " + dataDir + "    ·    This computer's ID: "
-                + deviceIdentity.deviceId());
+        footer.setText("Version " + AppVersion.current() + "    ·    Data folder: " + dataDir
+                + "    ·    This computer's ID: " + deviceIdentity.deviceId());
         navigator.currentProperty().addListener((obs, old, page) -> show(page));
         navigator.termProperty().addListener((obs, old, term) -> showBreadcrumb());
         navigator.start();

@@ -59,7 +59,7 @@ public final class Diagnostics {
             logFile = dir.resolve("angels-care-startup.log");
             Files.writeString(logFile, "", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            log("=== Angels Care " + LocalDateTime.now() + " ===");
+            log("=== Angels Care " + AppVersion.current() + ", " + LocalDateTime.now() + " ===");
             log("java " + System.getProperty("java.version")
                     + " on " + System.getProperty("os.name")
                     + " " + System.getProperty("os.arch"));

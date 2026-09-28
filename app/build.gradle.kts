@@ -18,7 +18,11 @@ plugins {
 }
 
 group = "org.angelscare"
-version = "1.0.0"
+// Every CI build gets a higher version, 1.0.<workflow run number>. Windows Installer only treats a
+// new installer as an upgrade of the installed one when its version is higher; with the same
+// version every time it refuses ("another version of this product is already installed").
+// Local builds are 1.0.0. Windows allows at most 255.255.65535, which AppVersionTest checks.
+version = "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
 
 repositories {
     mavenCentral()
@@ -61,6 +65,20 @@ tasks.test {
     doFirst { sqliteNative.mkdirs() }
 }
 
+// The version, as a resource the app reads at start-up (AppVersion) for the log and the footer.
+val writeVersion by tasks.registering {
+    val versionFile = layout.buildDirectory.file("generated/version/angels-care-version.properties")
+    val appVersion = project.version.toString()
+    inputs.property("version", appVersion)
+    outputs.file(versionFile)
+    doLast {
+        versionFile.get().asFile.writeText("version=$appVersion\n")
+    }
+}
+sourceSets.main {
+    resources.srcDir(writeVersion.map { it.outputs.files.singleFile.parentFile })
+}
+
 application {
     // Launcher, not FxApp: a main class that extends javafx.application.Application refuses to
     // start when JavaFX is on the classpath rather than the module path, which it is here.
@@ -81,6 +99,10 @@ runtime {
     jpackage {
         imageName = "AngelsCare"
         appVersion = project.version.toString()
+        // No --win-upgrade-uuid on purpose: jpackage derives the upgrade code from the vendor and
+        // the app name, which the installers already on people's PCs used too. Setting one now
+        // would make Windows see a different product and install it alongside the old one. So
+        // don't rename the app or set a vendor either.
         // The --win-* switches are rejected outright by jpackage on macOS, so they are applied only
         // on Windows. That keeps `./gradlew jpackage` working on the Mac for local testing.
         if (onWindows) {
