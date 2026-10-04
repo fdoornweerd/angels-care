@@ -72,6 +72,34 @@ public class LedgerSheetService {
         return save(itemId, term, month, rate == null ? null : rate.shillings(), true);
     }
 
+    /**
+     * Creates an item in {@code catalog} (this ledger's) and records its quantity and rate, each
+     * may be null, for one month of a term of the item's year. Checked before anything is written.
+     */
+    public Catalog.Item addItem(Catalog catalog, String categoryId, String name, String unit,
+            TermRef term, int month, Quantity quantity, Ugx rate) {
+        if (catalog.ledger() != ledger) {
+            throw new IllegalArgumentException("A " + catalog.ledger() + " item can't go on the "
+                    + ledger + " sheet.");
+        }
+        if (month < 1 || month > 3) {
+            throw new ValidationException("A term has months 1 to 3.");
+        }
+        if (rate != null && rate.isNegative()) {
+            throw new ValidationException("A rate can't be less than UGX 0.");
+        }
+        requireTermOfYear(plans.schoolYearOfCategory(categoryId)
+                .orElseThrow(() -> new ValidationException("That category no longer exists.")), term);
+        Catalog.Item item = catalog.createItem(categoryId, name, unit);
+        if (quantity != null) {
+            setQuantity(item.id(), term, month, quantity);
+        }
+        if (rate != null) {
+            setRate(item.id(), term, month, rate);
+        }
+        return item;
+    }
+
     /** What the category's items came to in each month of the term. */
     @Transactional(readOnly = true)
     public MonthlyAmounts categoryTotals(String categoryId, TermRef term) {

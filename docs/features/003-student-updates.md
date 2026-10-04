@@ -1,0 +1,3 @@
+- Add the option for Boarding vs Day Learner students as a category
+- Add Quantity (optional) and rate (optional) as options when adding new expense/income so that they can be added at the time an item is added if the user wants
+- Have base income amount per class but allow it to be editable for certain students, so that it autofills for a certain amount per class which can be changed at the top of each class (baby, middle, top, p1, p2, etc) for an option that would update base fee for the students

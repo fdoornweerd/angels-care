@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.HBox?>
@@ -11,7 +10,6 @@
       fx:controller="org.angelscare.management.student.ui.StudentsController" styleClass="page">
     <HBox spacing="16" alignment="CENTER_LEFT">
         <Label fx:id="title" text="Students" styleClass="page-title"/>
-        <CheckBox fx:id="showLeft" text="Show students who left"/>
         <Label fx:id="pageTotals" styleClass="total"/>
     </HBox>
     <Label fx:id="error"/>

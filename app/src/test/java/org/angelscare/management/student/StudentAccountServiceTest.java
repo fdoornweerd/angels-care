@@ -34,7 +34,7 @@ class StudentAccountServiceTest extends FinanceTest {
     }
 
     private void p7Fees() {
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000),
+        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
                 Ugx.of(10_000));
     }
 
@@ -42,41 +42,25 @@ class StudentAccountServiceTest extends FinanceTest {
     class Register {
 
         @Test
-        @DisplayName("AC-16: opening a term adds the Active students under their classes, once")
+        @DisplayName("AC-16: opening a term adds the students under their classes, once")
         void addsActiveStudents() {
+            // Who is left out (joined later, or Left before the term) is spec 003's AC-5 to AC-8.
             Student zed = createStudent("Zed", "Achan", SchoolClass.P7);
             Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
             Student ruth = createStudent("Ruth", "Akello", SchoolClass.TOP);
-            Student left = createStudent("Peter", "Opio", SchoolClass.P5);
-            finance.students.setStatus(left.id(), StudentStatus.LEFT);
 
             finance.studentAccounts.openTerm(t(2026, 1));
             finance.studentAccounts.openTerm(t(2026, 1));
 
-            assertThat(finance.studentAccounts.lines(t(2026, 1), false))
+            assertThat(finance.studentAccounts.lines(t(2026, 1)))
                     .extracting(StudentTermLine::name, StudentTermLine::schoolClass)
                     .containsExactly(
                             tuple("Ruth Akello", SchoolClass.TOP),
                             tuple("Zed Achan", SchoolClass.P7),
                             tuple("Amina Nakato", SchoolClass.P7));
             assertThat(liveRows("student_term")).isEqualTo(3);
-            assertThat(finance.studentAccounts.lines(t(2026, 1), true)).hasSize(3);
+            assertThat(finance.studentAccounts.lines(t(2026, 1))).hasSize(3);
             assertThat(amina.id()).isNotEqualTo(zed.id());
-        }
-
-        @Test
-        @DisplayName("AC-16: a student who leaves stays on the term; the Left switch shows them")
-        void leftStudentsOnlyWhenAsked() {
-            Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
-            finance.studentAccounts.openTerm(t(2026, 1));
-
-            finance.students.setStatus(amina.id(), StudentStatus.LEFT);
-
-            assertThat(finance.studentAccounts.lines(t(2026, 1), false)).isEmpty();
-            assertThat(finance.studentAccounts.lines(t(2026, 1), true))
-                    .extracting(StudentTermLine::status).containsExactly(StudentStatus.LEFT);
-            finance.studentAccounts.openTerm(t(2026, 2));
-            assertThat(finance.studentAccounts.lines(t(2026, 2), true)).isEmpty();
         }
 
         @Test
@@ -84,14 +68,14 @@ class StudentAccountServiceTest extends FinanceTest {
         void empty() {
             finance.studentAccounts.openTerm(t(2026, 1));
 
-            assertThat(finance.studentAccounts.lines(t(2026, 1), true)).isEmpty();
+            assertThat(finance.studentAccounts.lines(t(2026, 1))).isEmpty();
             assertThat(finance.studentAccounts.totals(t(2026, 1)).expected()).isEqualTo(Ugx.ZERO);
         }
 
         @Test
         @DisplayName("AC-19: a student added on the page exists and is on the term once")
         void addStudent() {
-            finance.studentAccounts.setClassFee(SchoolClass.P3, t(2026, 1), Ugx.of(200_000),
+            finance.studentAccounts.setClassFee(SchoolClass.P3, t(2026, 1), Ugx.of(200_000), null,
                     Ugx.of(5_000));
 
             Student brian = finance.studentAccounts.addStudent(t(2026, 1), "Brian", "Okello",
@@ -103,7 +87,7 @@ class StudentAccountServiceTest extends FinanceTest {
                 assertThat(s.schoolClass()).isEqualTo(SchoolClass.P3);
                 assertThat(s.residency()).isEqualTo(Residency.NATIONAL);
             });
-            assertThat(finance.studentAccounts.lines(t(2026, 1), false)).singleElement()
+            assertThat(finance.studentAccounts.lines(t(2026, 1))).singleElement()
                     .satisfies(line -> {
                         assertThat(line.amount()).isEqualTo(Ugx.of(200_000));
                         assertThat(line.ream()).isEqualTo(Ugx.of(5_000));
@@ -141,10 +125,10 @@ class StudentAccountServiceTest extends FinanceTest {
             finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 2, null);
             finance.studentAccounts.removeFromTerm(amina.id(), t(2026, 1));
 
-            assertThat(finance.studentAccounts.lines(t(2026, 1), true)).isEmpty();
+            assertThat(finance.studentAccounts.lines(t(2026, 1))).isEmpty();
             // Removed on purpose: opening the term again doesn't put them back.
             finance.studentAccounts.openTerm(t(2026, 1));
-            assertThat(finance.studentAccounts.lines(t(2026, 1), true)).isEmpty();
+            assertThat(finance.studentAccounts.lines(t(2026, 1))).isEmpty();
         }
     }
 
@@ -156,12 +140,13 @@ class StudentAccountServiceTest extends FinanceTest {
         void carriesForward() {
             p7Fees();
 
-            ClassFee p7 = new ClassFee(SchoolClass.P7, Ugx.of(300_000), Ugx.of(10_000));
+            ClassFee p7 = new ClassFee(SchoolClass.P7, Ugx.of(300_000), Ugx.ZERO,
+                    Ugx.of(10_000));
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 1))).isEqualTo(p7);
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 2))).isEqualTo(p7);
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2027, 1))).isEqualTo(p7);
 
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(320_000),
+            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(320_000), null,
                     Ugx.of(10_000));
 
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 2)).amount())
@@ -176,9 +161,9 @@ class StudentAccountServiceTest extends FinanceTest {
         @DisplayName("AC-17: a class with no fee ever set gets 0; negative fees are refused")
         void noFee() {
             assertThat(finance.studentAccounts.classFee(SchoolClass.P1, t(2026, 2)))
-                    .isEqualTo(new ClassFee(SchoolClass.P1, Ugx.ZERO, Ugx.ZERO));
+                    .isEqualTo(new ClassFee(SchoolClass.P1, Ugx.ZERO, Ugx.ZERO, Ugx.ZERO));
             assertThatThrownBy(() -> finance.studentAccounts.setClassFee(SchoolClass.P1, t(2026, 1),
-                    Ugx.of(-1), Ugx.ZERO)).isInstanceOf(ValidationException.class);
+                    Ugx.of(-1), null, Ugx.ZERO)).isInstanceOf(ValidationException.class);
         }
 
         @Test
@@ -189,7 +174,7 @@ class StudentAccountServiceTest extends FinanceTest {
             finance.studentAccounts.openTerm(t(2026, 1));
             finance.studentAccounts.openTerm(t(2026, 3));
 
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(320_000),
+            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(320_000), null,
                     Ugx.of(12_000));
 
             assertThat(line(amina, 2026, 1).amount()).isEqualTo(Ugx.of(300_000));

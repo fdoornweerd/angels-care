@@ -25,7 +25,10 @@ public class StudentService {
         this.deletionGuard = deletionGuard;
     }
 
-    /** New students are {@link StudentStatus#ACTIVE}. */
+    /**
+     * New students are {@link StudentStatus#ACTIVE} and Day, on no term yet. Marking them Left
+     * needs a term, so it is done by {@link StudentAccountService#editStudent}.
+     */
     public Student create(StudentDetails details) {
         StudentDetails clean = validate(details, null);
         return students.insert(clean, StudentStatus.ACTIVE);
@@ -35,15 +38,6 @@ public class StudentService {
         require(studentId);
         StudentDetails clean = validate(details, studentId);
         students.update(studentId, clean);
-        return require(studentId);
-    }
-
-    public Student setStatus(String studentId, StudentStatus status) {
-        require(studentId);
-        if (status == null) {
-            throw new ValidationException("Choose a status for the student.");
-        }
-        students.updateStatus(studentId, status);
         return require(studentId);
     }
 

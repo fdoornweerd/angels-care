@@ -277,6 +277,11 @@ July 2027. This replaces the rule above that every term date falls within one ca
   on the students page, with a student's own amount where needed.
 - `CalendarService.defaultTerm` is kept.
 
+**Spec 003 (student updates, 2026-10-03)**: a student marked Left now records their last term,
+so Left is set through Edit student on page 5 (`StudentAccountService.editStudent`) and
+`StudentService.setStatus` is gone, along with its test (AC-10's "marked LEFT and back to
+ACTIVE"). Students also record Day/Boarding and the term they joined (V4).
+
 ## Found during implementation
 - **Terms are passed as `TermRef` ("2026, Term 2"), not as ids.** Services resolve them through
   `CalendarService.requireTerm`, which gives the AC-15 message ("No school year has been set up

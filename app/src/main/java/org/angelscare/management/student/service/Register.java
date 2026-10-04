@@ -9,6 +9,7 @@ import org.angelscare.management.common.Ugx;
 import org.angelscare.management.student.model.ClassFee;
 import org.angelscare.management.student.model.SchoolClass;
 import org.angelscare.management.student.model.Student;
+import org.angelscare.management.student.model.StudentStatus;
 import org.angelscare.management.student.model.StudentTermLine;
 import org.angelscare.management.student.repository.ClassFeeRepository;
 import org.angelscare.management.student.repository.StudentTermRepository.Row;
@@ -35,8 +36,9 @@ final class Register {
         return fees.stream()
                 .filter(fee -> fee.schoolClass() == schoolClass && fee.term().compareTo(term) <= 0)
                 .max(Comparator.comparing(ClassFeeRepository.Row::term))
-                .map(fee -> new ClassFee(schoolClass, Ugx.of(fee.amount()), Ugx.of(fee.ream())))
-                .orElse(new ClassFee(schoolClass, Ugx.ZERO, Ugx.ZERO));
+                .map(fee -> new ClassFee(schoolClass, Ugx.of(fee.amount()),
+                        Ugx.of(fee.boardingAmount()), Ugx.of(fee.ream())))
+                .orElse(new ClassFee(schoolClass, Ugx.ZERO, Ugx.ZERO, Ugx.ZERO));
     }
 
     StudentTermLine line(Row row) {
@@ -46,8 +48,10 @@ final class Register {
                 row.studentId(),
                 student == null ? "(deleted student)" : student.fullName(),
                 student == null ? null : student.status(),
+                hadLeft(student, row.term()),
                 row.schoolClass(),
-                row.amount() == null ? fee.amount() : Ugx.of(row.amount()),
+                row.boarding(),
+                row.amount() == null ? fee.feeFor(row.boarding()) : Ugx.of(row.amount()),
                 row.amount() != null,
                 row.debt() == null ? carriedDebt(row) : Ugx.of(row.debt()),
                 row.debt() != null,
@@ -55,6 +59,12 @@ final class Register {
                 row.ream() != null,
                 ugx(row.paid1()), ugx(row.paid2()), ugx(row.paid3()),
                 row.remarks());
+    }
+
+    /** On their last term, or a later one they are still on (because they paid for it). */
+    private static boolean hadLeft(Student student, TermRef term) {
+        return student != null && student.status() == StudentStatus.LEFT
+                && (student.lastTerm() == null || term.compareTo(student.lastTerm()) >= 0);
     }
 
     /** The balance of the student's latest earlier line, or 0 if this is their first term. */

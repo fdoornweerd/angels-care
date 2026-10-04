@@ -43,6 +43,6 @@ public abstract class ScreenTest extends FinanceTest {
     }
 
     protected StudentsViewModel studentsPage() {
-        return new StudentsViewModel(finance.studentAccounts, dialogs);
+        return new StudentsViewModel(finance.studentAccounts, finance.calendar, dialogs);
     }
 }

@@ -130,7 +130,7 @@ public abstract class FinanceTest extends DatabaseTest {
         record(finance.expenseSheet, maize.id(), t(2026, 1), 1, "50", 3_500);
         finance.incomeSheet.setPlan(donations.id(), t(2026, 1), Ugx.of(600_000));
         finance.expenseSheet.setPlan(feeding.id(), t(2026, 1), Ugx.of(500_000));
-        finance.studentAccounts.setClassFee(SchoolClass.P4, t(2026, 1), Ugx.of(250_000),
+        finance.studentAccounts.setClassFee(SchoolClass.P4, t(2026, 1), Ugx.of(250_000), null,
                 Ugx.of(10_000));
         finance.studentAccounts.openTerm(t(2026, 1));
         finance.studentAccounts.setPayment(student.id(), t(2026, 1), 1, Ugx.of(100_000));

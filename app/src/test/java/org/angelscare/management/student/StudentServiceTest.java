@@ -9,6 +9,7 @@ import org.angelscare.management.student.model.Residency;
 import org.angelscare.management.student.model.SchoolClass;
 import org.angelscare.management.student.model.Student;
 import org.angelscare.management.student.model.StudentDetails;
+import org.angelscare.management.student.model.StudentEdit;
 import org.angelscare.management.student.model.StudentFilter;
 import org.angelscare.management.student.model.StudentStatus;
 import org.angelscare.management.support.FinanceTest;
@@ -53,17 +54,6 @@ class StudentServiceTest extends FinanceTest {
         assertThatThrownBy(() -> finance.students.create(
                 StudentDetails.of("Amina", "Nakato", SchoolClass.P1, null)))
                 .isInstanceOf(ValidationException.class);
-    }
-
-    @Test
-    @DisplayName("AC-10: a student can be marked LEFT and back to ACTIVE")
-    void changesStatus() {
-        Student student = createStudent("Amina", "Nakato", SchoolClass.P3);
-
-        assertThat(finance.students.setStatus(student.id(), StudentStatus.LEFT).status())
-                .isEqualTo(StudentStatus.LEFT);
-        assertThat(finance.students.setStatus(student.id(), StudentStatus.ACTIVE).status())
-                .isEqualTo(StudentStatus.ACTIVE);
     }
 
     @Test
@@ -125,7 +115,9 @@ class StudentServiceTest extends FinanceTest {
         Student brianOkello = createStudent("Brian", "Okello", SchoolClass.P3);
         Student aminaOkello = createStudent("Amina", "Okello", SchoolClass.P3);
         Student zedAchan = createStudent("Zed", "Achan", SchoolClass.P4);
-        finance.students.setStatus(zedAchan.id(), StudentStatus.LEFT);
+        createYear(2026);
+        finance.studentAccounts.editStudent(zedAchan.id(), t(2026, 1), new StudentEdit("Zed",
+                "Achan", Residency.NATIONAL, t(2026, 1), StudentStatus.LEFT));
 
         assertThat(finance.students.list(StudentFilter.ALL)).extracting(Student::id)
                 .containsExactly(zedAchan.id(), aminaOkello.id(), brianOkello.id());

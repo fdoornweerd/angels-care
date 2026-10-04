@@ -6,13 +6,16 @@ import org.angelscare.management.common.Ugx;
 /**
  * One student's line on page 5 for one term. {@code amount}, {@code debt} and {@code ream} are
  * the values in force (the student's own, or the class fee / carried balance); the flags say
- * whether they were typed for this student. Payments are null while blank.
+ * whether they were typed for this student. Payments are null while blank. {@code left} says the
+ * student had left by this term (it is their last term, or a later one they paid for).
  */
 public record StudentTermLine(
         String studentId,
         String name,
         StudentStatus status,
+        boolean left,
         SchoolClass schoolClass,
+        Boarding boarding,
         Ugx amount,
         boolean amountOverridden,
         Ugx debt,
@@ -23,6 +26,11 @@ public record StudentTermLine(
         Ugx paid2,
         Ugx paid3,
         String remarks) {
+
+    /** The name as page 5 shows it: "Ben Okello (Left)" on a term the student had left by. */
+    public String shownName() {
+        return left ? name + " (Left)" : name;
+    }
 
     /** Amount + Debt + Ream: what is owed this term. */
     public Ugx total() {

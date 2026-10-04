@@ -1,22 +1,26 @@
 package org.angelscare.management.student.ui;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
-import javafx.beans.property.BooleanProperty;
+import java.util.function.Supplier;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import org.angelscare.management.calendar.model.Term;
 import org.angelscare.management.calendar.model.TermRef;
+import org.angelscare.management.calendar.service.CalendarService;
 import org.angelscare.management.common.Ugx;
 import org.angelscare.management.common.ValidationException;
 import org.angelscare.management.common.ui.ConfirmDialogs;
 import org.angelscare.management.common.ui.ErrorMessages;
 import org.angelscare.management.common.ui.UgxField;
+import org.angelscare.management.student.model.Boarding;
 import org.angelscare.management.student.model.ClassFee;
 import org.angelscare.management.student.model.RegisterTotals;
 import org.angelscare.management.student.model.Residency;
@@ -26,7 +30,7 @@ import org.angelscare.management.student.service.StudentAccountService;
 
 /**
  * Page 5: the students of a term, one table per class (Nursery, then Primary). An edit to one
- * student replaces just their line; class fee edits and added or removed students reload.
+ * student replaces just their line; class fee edits and added, edited or removed students reload.
  */
 public class StudentsViewModel {
 
@@ -34,6 +38,7 @@ public class StudentsViewModel {
     public static final class ClassSection {
         private final SchoolClass schoolClass;
         private final ObservableList<StudentTermLine> lines = FXCollections.observableArrayList();
+        private final ObservableList<StudentTermLine> rows = FXCollections.observableArrayList();
         private final ReadOnlyObjectWrapper<ClassFee> fee = new ReadOnlyObjectWrapper<>();
         private final ReadOnlyObjectWrapper<RegisterTotals> totals = new ReadOnlyObjectWrapper<>();
 
@@ -56,6 +61,25 @@ public class StudentsViewModel {
         public ReadOnlyObjectProperty<RegisterTotals> totalsProperty() {
             return totals.getReadOnlyProperty();
         }
+
+        /** The table's rows: the students, then a totals row (no student id) when there are any. */
+        public ObservableList<StudentTermLine> rows() {
+            return rows;
+        }
+
+        /**
+         * Works out the totals, then hands the table its rows. In that order, so that whoever is
+         * told the rows changed already sees the new totals.
+         */
+        private void publish() {
+            RegisterTotals now = RegisterTotals.of(lines);
+            totals.set(now);
+            List<StudentTermLine> all = new ArrayList<>(lines);
+            if (!all.isEmpty()) {
+                all.add(totalsRow(schoolClass, now));
+            }
+            rows.setAll(all);
+        }
     }
 
     /** A value typed into a cell, read or rejected with the "whole amount" message. */
@@ -69,24 +93,21 @@ public class StudentsViewModel {
     }
 
     private final StudentAccountService accounts;
+    private final CalendarService calendar;
     private final ConfirmDialogs dialogs;
     private final ObservableList<ClassSection> sections = FXCollections.observableArrayList();
-    private final BooleanProperty showLeft = new SimpleBooleanProperty(false);
     private final ReadOnlyObjectWrapper<RegisterTotals> pageTotals = new ReadOnlyObjectWrapper<>();
     private final ReadOnlyStringWrapper error = new ReadOnlyStringWrapper("");
     private TermRef term;
 
-    public StudentsViewModel(StudentAccountService accounts, ConfirmDialogs dialogs) {
+    public StudentsViewModel(StudentAccountService accounts, CalendarService calendar,
+            ConfirmDialogs dialogs) {
         this.accounts = accounts;
+        this.calendar = calendar;
         this.dialogs = dialogs;
-        showLeft.addListener((obs, old, now) -> {
-            if (term != null) {
-                reload();
-            }
-        });
     }
 
-    /** Opens the term (adding Active students not yet on it) and loads it. */
+    /** Opens the term (adding the students who belong to it) and loads it. */
     public void show(TermRef term) {
         this.term = term;
         error.set("");
@@ -104,11 +125,7 @@ public class StudentsViewModel {
                 .orElseThrow();
     }
 
-    /** "Show students who left". */
-    public BooleanProperty showLeftProperty() {
-        return showLeft;
-    }
-
+    /** Every student on the term, Left ones included: the same figures as page 2's Students row. */
     public ReadOnlyObjectProperty<RegisterTotals> pageTotalsProperty() {
         return pageTotals.getReadOnlyProperty();
     }
@@ -135,40 +152,61 @@ public class StudentsViewModel {
                 amount -> accounts.setPayment(line.studentId(), term, month, amount));
     }
 
+    /** This term and the later terms the student is on; earlier terms keep theirs. */
+    public boolean editBoarding(StudentTermLine line, Boarding boarding) {
+        return save(line, () -> accounts.setBoarding(line.studentId(), term, boarding));
+    }
+
     public boolean editRemarks(StudentTermLine line, String text) {
-        error.set("");
-        try {
-            replace(accounts.setRemarks(line.studentId(), term, text));
-        } catch (Exception e) {
-            error.set(line.name() + ": " + ErrorMessages.forException(e));
-            return false;
-        }
-        return true;
+        return save(line, () -> accounts.setRemarks(line.studentId(), term, text));
     }
 
     public boolean editClassFee(ClassSection section, String text) {
         ClassFee fee = section.fee.get();
         return editClass(section, text, amount -> accounts.setClassFee(section.schoolClass, term,
-                amount, fee.ream()));
+                amount, fee.boardingFee(), fee.ream()));
+    }
+
+    public boolean editClassBoardingFee(ClassSection section, String text) {
+        ClassFee fee = section.fee.get();
+        return editClass(section, text, boardingFee -> accounts.setClassFee(section.schoolClass,
+                term, fee.amount(), boardingFee, fee.ream()));
     }
 
     public boolean editClassReam(ClassSection section, String text) {
         ClassFee fee = section.fee.get();
         return editClass(section, text, ream -> accounts.setClassFee(section.schoolClass, term,
-                fee.amount(), ream));
+                fee.amount(), fee.boardingFee(), ream));
+    }
+
+    /** A Day student. */
+    public boolean addStudent(SchoolClass schoolClass, String firstName, String lastName,
+            Residency residency) {
+        return addStudent(schoolClass, firstName, lastName, residency, Boarding.DAY);
     }
 
     public boolean addStudent(SchoolClass schoolClass, String firstName, String lastName,
-            Residency residency) {
+            Residency residency, Boarding boarding) {
         error.set("");
         try {
-            accounts.addStudent(term, firstName, lastName, schoolClass, residency);
+            accounts.addStudent(term, firstName, lastName, schoolClass, residency, boarding);
         } catch (Exception e) {
             error.set(ErrorMessages.forException(e));
             return false;
         }
         reload();
         return true;
+    }
+
+    /** The Edit student dialog for this line; saving it reloads the page. */
+    public EditStudentViewModel editor(StudentTermLine line) {
+        List<TermRef> terms = calendar.listYears().stream()
+                .flatMap(year -> year.terms().stream())
+                .map(Term::ref)
+                .sorted(Comparator.naturalOrder())
+                .toList();
+        return new EditStudentViewModel(accounts, accounts.student(line.studentId()), term, terms,
+                this::reload);
     }
 
     /** After a confirmation; refused when the student has payments this term. */
@@ -197,9 +235,21 @@ public class StudentsViewModel {
 
     private boolean edit(StudentTermLine line, String text, Parser parser, LineSave save) {
         error.set("");
+        Ugx value;
         try {
-            Ugx value = text == null || text.isBlank() ? null : parser.parse(text);
-            replace(save.save(value));
+            value = text == null || text.isBlank() ? null : parser.parse(text);
+        } catch (Exception e) {
+            error.set(line.name() + ": " + ErrorMessages.forException(e));
+            return false;
+        }
+        return save(line, () -> save.save(value));
+    }
+
+    /** Runs a save of one student's line and puts the result in place, or shows why not. */
+    private boolean save(StudentTermLine line, Supplier<StudentTermLine> save) {
+        error.set("");
+        try {
+            replace(save.get());
         } catch (Exception e) {
             error.set(line.name() + ": " + ErrorMessages.forException(e));
             return false;
@@ -223,7 +273,7 @@ public class StudentsViewModel {
         return true;
     }
 
-    /** Puts a student's updated line in place, and updates the totals. */
+    /** Puts a student's updated line in place, then the class's and the page's totals. */
     private void replace(StudentTermLine updated) {
         ClassSection section = section(updated.schoolClass());
         for (int i = 0; i < section.lines.size(); i++) {
@@ -231,20 +281,27 @@ public class StudentsViewModel {
                 section.lines.set(i, updated);
             }
         }
-        section.totals.set(RegisterTotals.of(section.lines));
+        section.publish();
         pageTotals.set(RegisterTotals.of(sections.stream()
                 .flatMap(s -> s.lines.stream()).toList()));
     }
 
     private void reload() {
-        List<StudentTermLine> lines = accounts.lines(term, showLeft.get());
+        List<StudentTermLine> lines = accounts.lines(term);
         sections.setAll(Arrays.stream(SchoolClass.values()).map(schoolClass -> {
             ClassSection section = new ClassSection(schoolClass);
             section.lines.setAll(lines.stream().filter(l -> l.schoolClass() == schoolClass).toList());
             section.fee.set(accounts.classFee(schoolClass, term));
-            section.totals.set(RegisterTotals.of(section.lines));
+            section.publish();
             return section;
         }).toList());
         pageTotals.set(RegisterTotals.of(lines));
+    }
+
+    /** The totals row shown under a class's students, in the same columns. */
+    private static StudentTermLine totalsRow(SchoolClass schoolClass, RegisterTotals totals) {
+        return new StudentTermLine(null, "Total", null, false, schoolClass, null, totals.amount(),
+                false, totals.debt(), false, totals.ream(), false, totals.paid().first(),
+                totals.paid().second(), totals.paid().third(), null);
     }
 }

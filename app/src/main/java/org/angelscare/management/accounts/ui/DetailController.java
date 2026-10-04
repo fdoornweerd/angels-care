@@ -22,6 +22,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import org.angelscare.management.accounts.ui.DetailViewModel.CategorySection;
+import org.angelscare.management.accounts.ui.DetailViewModel.Cell;
 import org.angelscare.management.accounts.ui.DetailViewModel.ItemLine;
 import org.angelscare.management.common.ui.fx.Fx;
 import org.angelscare.management.shell.ui.Navigator;
@@ -157,17 +158,34 @@ public class DetailController implements PageController {
         TextField unit = new TextField();
         unit.setPromptText("Unit (kg, bags…)");
         unit.setPrefColumnCount(8);
+        // Optional: the selected month's quantity and rate, so a new item is filled in at once.
+        TextField quantity = new TextField();
+        quantity.setPromptText("Quantity");
+        quantity.setPrefColumnCount(6);
+        quantity.setAlignment(Pos.CENTER_RIGHT);
+        TextField rate = new TextField();
+        rate.setPromptText("Rate (UGX)");
+        rate.setPrefColumnCount(8);
+        rate.setAlignment(Pos.CENTER_RIGHT);
+        section.invalidAddFieldProperty().addListener((obs, old, field) -> {
+            quantity.getStyleClass().remove("invalid");
+            rate.getStyleClass().remove("invalid");
+            if (field == Cell.QUANTITY) {
+                quantity.getStyleClass().add("invalid");
+            } else if (field == Cell.RATE) {
+                rate.getStyleClass().add("invalid");
+            }
+        });
         Button add = new Button("Add item");
         add.setMinWidth(Region.USE_PREF_SIZE);
-        Runnable addItem = () -> {
-            if (page.addItem(section, itemName.getText(), unit.getText())) {
-                itemName.clear();
-                unit.clear();
-            }
-        };
+        // On success the page is rebuilt with empty fields; when refused, what was typed stays.
+        Runnable addItem = () -> page.addItem(section, itemName.getText(), unit.getText(),
+                quantity.getText(), rate.getText());
         add.setOnAction(event -> addItem.run());
         unit.setOnAction(event -> addItem.run());
-        HBox addRow = new HBox(8, itemName, unit, add);
+        quantity.setOnAction(event -> addItem.run());
+        rate.setOnAction(event -> addItem.run());
+        HBox addRow = new HBox(8, itemName, unit, quantity, rate, add);
         addRow.setAlignment(Pos.CENTER_LEFT);
 
         Label monthTotal = new Label();

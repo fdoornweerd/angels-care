@@ -1,19 +1,17 @@
 package org.angelscare.management.student.ui;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
@@ -24,14 +22,14 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.util.StringConverter;
 import org.angelscare.management.calendar.model.TermRef;
 import org.angelscare.management.common.Ugx;
 import org.angelscare.management.common.ui.fx.Fx;
 import org.angelscare.management.shell.ui.Navigator;
 import org.angelscare.management.shell.ui.PageController;
+import org.angelscare.management.student.model.Boarding;
+import org.angelscare.management.student.model.ClassFee;
 import org.angelscare.management.student.model.Level;
-import org.angelscare.management.student.model.RegisterTotals;
 import org.angelscare.management.student.model.Residency;
 import org.angelscare.management.student.model.SchoolClass;
 import org.angelscare.management.student.model.StudentTermLine;
@@ -50,8 +48,6 @@ class StudentsController implements PageController {
     @FXML
     private Label title;
     @FXML
-    private CheckBox showLeft;
-    @FXML
     private Label pageTotals;
     @FXML
     private Label error;
@@ -66,7 +62,6 @@ class StudentsController implements PageController {
     @FXML
     void initialize() {
         Fx.bindError(error, page.errorProperty());
-        showLeft.selectedProperty().bindBidirectional(page.showLeftProperty());
         page.sections().addListener((ListChangeListener<ClassSection>) change -> rebuild());
         pageTotals.textProperty().bind(page.pageTotalsProperty().map(totals ->
                 "Owed UGX " + Fx.money(totals.total()) + "  ·  Paid UGX "
@@ -100,31 +95,18 @@ class StudentsController implements PageController {
         Label name = new Label(schoolClass.label());
         name.getStyleClass().add("section-title");
         name.setMinWidth(70);
-        TextField fee = moneyField(section.feeProperty().get().amount());
-        Fx.commitOnLeave(fee, (field, text) ->
-                text.equals(Fx.money(section.feeProperty().get().amount()))
-                        || page.editClassFee(section, text));
-        TextField ream = moneyField(section.feeProperty().get().ream());
-        Fx.commitOnLeave(ream, (field, text) ->
-                text.equals(Fx.money(section.feeProperty().get().ream()))
-                        || page.editClassReam(section, text));
-        HBox header = new HBox(12, name, new Label("Fee (UGX)"), fee, new Label("Ream (UGX)"), ream);
+        HBox header = new HBox(12, name,
+                new Label("Day fee (UGX)"), feeField(section, ClassFee::amount, page::editClassFee),
+                new Label("Boarding fee (UGX)"),
+                feeField(section, ClassFee::boardingFee, page::editClassBoardingFee),
+                new Label("Ream (UGX)"), feeField(section, ClassFee::ream, page::editClassReam));
         header.setAlignment(Pos.CENTER_LEFT);
 
-        ObservableList<StudentTermLine> rows = FXCollections.observableArrayList();
-        Runnable fill = () -> {
-            List<StudentTermLine> all = new ArrayList<>(section.lines());
-            if (!all.isEmpty()) {
-                all.add(totalsLine(schoolClass, section.totalsProperty().get()));
-            }
-            rows.setAll(all);
-        };
-        fill.run();
-        section.lines().addListener((ListChangeListener<StudentTermLine>) change -> fill.run());
-
-        TableView<StudentTermLine> table = new TableView<>(rows);
+        // The view model keeps the rows, totals row included, so the table only shows them.
+        TableView<StudentTermLine> table = new TableView<>(section.rows());
         table.getColumns().setAll(List.of(
-                Fx.column("Name", StudentTermLine::name),
+                Fx.column("Name", StudentTermLine::shownName),
+                boardingColumn(),
                 money("Amount", StudentTermLine::amount, page::editAmount),
                 money("Debt", StudentTermLine::debt, page::editDebt),
                 money("Ream", StudentTermLine::ream, page::editReam),
@@ -136,7 +118,9 @@ class StudentsController implements PageController {
                 Fx.editableColumn("Remarks",
                         (StudentTermLine l) -> constant(l.remarks() == null ? "" : l.remarks()),
                         page::editRemarks, StudentsController::isStudent, false),
-                removeColumn()));
+                buttonColumn("Edit", 64, line ->
+                        EditStudentDialog.show(sections.getScene().getWindow(), page.editor(line))),
+                buttonColumn("Remove", 90, page::removeFromTerm)));
         table.getColumns().get(0).setMinWidth(150);
         table.setPlaceholder(Fx.hint("No students in " + schoolClass.label() + "."));
         table.setRowFactory(t -> new TableRow<>() {
@@ -157,32 +141,37 @@ class StudentsController implements PageController {
         last.setPromptText("Last name");
         ComboBox<Residency> residency = new ComboBox<>(
                 FXCollections.observableArrayList(Residency.values()));
-        residency.setConverter(new StringConverter<>() {
-            @Override
-            public String toString(Residency value) {
-                return value == Residency.REFUGEE ? "Refugee" : "National";
-            }
-
-            @Override
-            public Residency fromString(String text) {
-                return "Refugee".equalsIgnoreCase(text) ? Residency.REFUGEE : Residency.NATIONAL;
-            }
-        });
+        residency.setConverter(Choices.RESIDENCY);
         residency.setValue(Residency.NATIONAL);
+        ComboBox<Boarding> boarding = new ComboBox<>(
+                FXCollections.observableArrayList(Boarding.values()));
+        boarding.setConverter(Choices.BOARDING);
+        boarding.setValue(Boarding.DAY);
         Button add = new Button("Add student to " + schoolClass.label());
         add.setMinWidth(Region.USE_PREF_SIZE);
         add.setOnAction(event -> {
-            if (page.addStudent(schoolClass, first.getText(), last.getText(), residency.getValue())) {
+            if (page.addStudent(schoolClass, first.getText(), last.getText(), residency.getValue(),
+                    boarding.getValue())) {
                 first.clear();
                 last.clear();
             }
         });
-        HBox addRow = new HBox(8, first, last, residency, add);
+        HBox addRow = new HBox(8, first, last, residency, boarding, add);
         addRow.setAlignment(Pos.CENTER_LEFT);
 
         VBox box = new VBox(8, header, table, addRow);
         box.getStyleClass().add("panel");
         return box;
+    }
+
+    /** A class fee field in the heading; saved when left, if it changed. */
+    private TextField feeField(ClassSection section, Function<ClassFee, Ugx> fee,
+            BiPredicate<ClassSection, String> save) {
+        TextField field = moneyField(fee.apply(section.feeProperty().get()));
+        Fx.commitOnLeave(field, (f, text) ->
+                text.equals(Fx.money(fee.apply(section.feeProperty().get())))
+                        || save.test(section, text));
+        return field;
     }
 
     /** An editable amount column; the totals row is read-only. */
@@ -193,33 +182,70 @@ class StudentsController implements PageController {
                 commit, StudentsController::isStudent, true);
     }
 
-    private TableColumn<StudentTermLine, String> removeColumn() {
-        TableColumn<StudentTermLine, String> column = new TableColumn<>("");
+    /** Day or Boarding, picked per student; blank on the totals row. */
+    private TableColumn<StudentTermLine, String> boardingColumn() {
+        TableColumn<StudentTermLine, String> column = new TableColumn<>("Day/Boarding");
         column.setSortable(false);
-        column.setMinWidth(90);
-        column.setMaxWidth(90);
+        column.setMinWidth(110);
+        column.setMaxWidth(110);
+        column.setCellValueFactory(cell -> constant(cell.getValue().boarding() == null
+                ? "" : cell.getValue().boarding().name()));
         column.setCellFactory(c -> new TableCell<>() {
-            private final Button remove = new Button("Remove");
+            private final ComboBox<Boarding> choice = new ComboBox<>(
+                    FXCollections.observableArrayList(Boarding.values()));
+            private boolean showing;
 
             {
-                remove.setOnAction(e -> page.removeFromTerm(getTableRow().getItem()));
+                choice.setConverter(Choices.BOARDING);
+                choice.setMaxWidth(Double.MAX_VALUE);
+                choice.setOnAction(e -> {
+                    StudentTermLine line = getTableRow() == null ? null : getTableRow().getItem();
+                    if (!showing && line != null && isStudent(line)
+                            && choice.getValue() != null && choice.getValue() != line.boarding()) {
+                        page.editBoarding(line, choice.getValue());
+                    }
+                });
             }
 
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
                 StudentTermLine line = empty || getTableRow() == null ? null : getTableRow().getItem();
-                setGraphic(line == null || !isStudent(line) ? null : remove);
+                if (line == null || !isStudent(line)) {
+                    setGraphic(null);
+                    return;
+                }
+                showing = true;
+                choice.setValue(line.boarding());
+                showing = false;
+                setGraphic(choice);
             }
         });
         return column;
     }
 
-    /** The totals row shown under a class's students, in the same columns. */
-    private static StudentTermLine totalsLine(SchoolClass schoolClass, RegisterTotals totals) {
-        return new StudentTermLine(null, "Total", null, schoolClass, totals.amount(), false,
-                totals.debt(), false, totals.ream(), false, totals.paid().first(),
-                totals.paid().second(), totals.paid().third(), null);
+    /** A button on every student's line (not the totals row). */
+    private static TableColumn<StudentTermLine, String> buttonColumn(String text, double width,
+            Consumer<StudentTermLine> action) {
+        TableColumn<StudentTermLine, String> column = new TableColumn<>("");
+        column.setSortable(false);
+        column.setMinWidth(width);
+        column.setMaxWidth(width);
+        column.setCellFactory(c -> new TableCell<>() {
+            private final Button button = new Button(text);
+
+            {
+                button.setOnAction(e -> action.accept(getTableRow().getItem()));
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                StudentTermLine line = empty || getTableRow() == null ? null : getTableRow().getItem();
+                setGraphic(line == null || !isStudent(line) ? null : button);
+            }
+        });
+        return column;
     }
 
     private static boolean isStudent(StudentTermLine line) {
