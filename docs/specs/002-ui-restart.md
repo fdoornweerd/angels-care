@@ -357,6 +357,19 @@ Recommendations accepted at approval:
   applied V3 (categories joined 2026-2027, `app_meta` unchanged, integrity and foreign-key checks
   clean), and the `jpackageImage` app starts on it. The pages were walked on a copy of it.
 
+## Changed later
+**Spec 003 (student updates, 2026-10-03)** changed page 5:
+- **The "Show students who left" switch is gone.** Left students are always listed on the terms
+  they're on, "(Left)" on their last term, and always count, so page 5's totals equal page 2's
+  Students row (AC-16's switch test was removed; spec 003's AC-10 replaces it).
+- **Opening a term adds only the students who belong to it** (joined by then, not left before
+  it), not every Active student: viewing an earlier term used to put students who joined later
+  onto it, with that term's fee carried into their debt.
+- Each class has a **Day fee and a Boarding fee** (plus Ream), and students are Day or Boarding,
+  recorded per term like class.
+- The class totals row is built by the view model (`ClassSection.rows()`); it used to lag one
+  edit behind.
+
 ## Out of scope
 Student photos. Promoting a whole class to the next class. Printing, reports and exports. Receipts
 and exact payment dates (only which month). Groups and fee assignments (their code is removed;

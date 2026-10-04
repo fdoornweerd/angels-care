@@ -2,6 +2,7 @@ package org.angelscare.management.accounts.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import org.angelscare.management.accounts.model.SummaryRow;
@@ -131,7 +132,7 @@ class DetailViewModelTest extends ScreenTest {
     @DisplayName("AC-12: the income page's Students row matches page 2's")
     void studentsRow() {
         var amina = createStudent("Amina", "Nakato", SchoolClass.P7);
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000),
+        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
                 Ugx.of(10_000));
         finance.studentAccounts.openTerm(t(2026, 1));
         finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 2, Ugx.of(120_000));
@@ -272,5 +273,132 @@ class DetailViewModelTest extends ScreenTest {
         assertThat(page.editItem(line(section(page, "Food"), "Maize flour"), "Maize", "bags"))
                 .isTrue();
         assertThat(line(section(page, "Food"), "Maize").item().unit()).isEqualTo("bags");
+    }
+
+    private static SummaryRow feedingOnPage2(TermSummaryViewModel summary, Side side) {
+        return (side.income() ? summary.incomeRows() : summary.expenseRows()).stream()
+                .filter(r -> "Feeding".equals(r.name())).findFirst().orElseThrow();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sides")
+    @DisplayName("AC-13 (003): an item added with quantity and rate has them in the selected month only")
+    void addItemWithQuantityAndRate(Side side) {
+        DetailViewModel page = open(side);
+        page.addCategory("Feeding");
+        page.monthProperty().set(2);
+
+        assertThat(page.addItem(section(page, "Feeding"), "Maize", "kg", "12.5", "3,500"))
+                .as(page.error()).isTrue();
+
+        CategorySection feeding = section(page, "Feeding");
+        ItemLine maize = line(feeding, "Maize");
+        assertThat(maize.quantityTextProperty().get()).isEqualTo("12.5");
+        assertThat(maize.rateTextProperty().get()).isEqualTo("3,500");
+        assertThat(maize.amountTextProperty().get()).isEqualTo("43,750");
+        assertThat(feeding.monthTotalProperty().get()).isEqualTo(Ugx.of(43_750));
+        assertThat(feeding.termTotalProperty().get()).isEqualTo(Ugx.of(43_750));
+        var sheet = side.income() ? finance.incomeSheet : finance.expenseSheet;
+        String itemId = maize.item().id();
+        assertThat(sheet.entry(itemId, t(2026, 1), 1).quantity()).isNull();
+        assertThat(sheet.entry(itemId, t(2026, 1), 3).rate()).isNull();
+        TermSummaryViewModel summary = termSummaryPage();
+        summary.show(t(2026, 1));
+        assertThat(feedingOnPage2(summary, side).actual().month(2)).isEqualTo(Ugx.of(43_750));
+        // Like any item, it belongs to the whole school year, blank elsewhere.
+        DetailViewModel term3 = side.page().apply(this);
+        term3.show(t(2026, 3), null);
+        assertThat(line(section(term3, "Feeding"), "Maize").quantityTextProperty().get())
+                .isEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sides")
+    @DisplayName("AC-13 (003): blank quantity and rate add a blank item; with only one, that one is stored")
+    void addItemPartlyFilled(Side side) {
+        DetailViewModel page = open(side);
+        page.addCategory("Feeding");
+        page.monthProperty().set(2);
+        String entries = side.income() ? "income_entry" : "expense_entry";
+
+        assertThat(page.addItem(section(page, "Feeding"), "Beans", "kg", "", "")).isTrue();
+        assertThat(liveRows(entries)).isZero();
+        ItemLine beans = line(section(page, "Feeding"), "Beans");
+        assertThat(beans.quantityTextProperty().get()).isEmpty();
+        assertThat(beans.rateTextProperty().get()).isEmpty();
+
+        assertThat(page.addItem(section(page, "Feeding"), "Salt", "bags", "3", " ")).isTrue();
+        ItemLine salt = line(section(page, "Feeding"), "Salt");
+        assertThat(salt.quantityTextProperty().get()).isEqualTo("3");
+        assertThat(salt.rateTextProperty().get()).isEmpty();
+        assertThat(salt.amountTextProperty().get()).isEmpty();
+
+        assertThat(page.addItem(section(page, "Feeding"), "Sugar", "kg", "", "4,000")).isTrue();
+        assertThat(line(section(page, "Feeding"), "Sugar").rateTextProperty().get())
+                .isEqualTo("4,000");
+        assertThat(liveRows(entries)).isEqualTo(2);
+        assertThat(section(page, "Feeding").monthTotalProperty().get()).isEqualTo(Ugx.ZERO);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sides")
+    @DisplayName("AC-14 (003): an unreadable quantity or rate creates nothing, marks the field and names it")
+    void addItemRefused(Side side) {
+        DetailViewModel page = open(side);
+        page.addCategory("Feeding");
+        page.monthProperty().set(2);
+        String items = side.income() ? "income_item" : "expense_item";
+        String entries = side.income() ? "income_entry" : "expense_entry";
+
+        for (String quantity : List.of("-1", "1.234", "abc")) {
+            assertThat(page.addItem(section(page, "Feeding"), "Rice", "kg", quantity, "3,000"))
+                    .as(quantity).isFalse();
+            assertThat(page.error()).as(quantity).startsWith("Quantity: ");
+            assertThat(section(page, "Feeding").invalidAddFieldProperty().get()).as(quantity)
+                    .isEqualTo(Cell.QUANTITY);
+        }
+        for (String rate : List.of("-5", "12.5", "abc")) {
+            assertThat(page.addItem(section(page, "Feeding"), "Rice", "kg", "2", rate))
+                    .as(rate).isFalse();
+            assertThat(page.error()).as(rate).startsWith("Rate: ");
+            assertThat(section(page, "Feeding").invalidAddFieldProperty().get()).as(rate)
+                    .isEqualTo(Cell.RATE);
+        }
+        assertThat(liveRows(items)).isZero();
+        assertThat(liveRows(entries)).isZero();
+        assertThat(section(page, "Feeding").lines()).isEmpty();
+
+        assertThat(page.addItem(section(page, "Feeding"), "Rice", "kg", "2", "3,000")).isTrue();
+        assertThat(section(page, "Feeding").invalidAddFieldProperty().get()).isNull();
+        assertThat(page.error()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("sides")
+    @DisplayName("AC-16 (003): quantity, rate and plan edits show at once, and on page 2 when it is opened again")
+    void totalsFollowEdits(Side side) {
+        DetailViewModel page = withMaize(side);
+        TermSummaryViewModel summary = termSummaryPage();
+
+        page.editQuantity(line(section(page, "Feeding"), "Maize flour"), "2");
+        page.editRate(line(section(page, "Feeding"), "Maize flour"), "5,000");
+
+        assertThat(line(section(page, "Feeding"), "Maize flour").amountTextProperty().get())
+                .isEqualTo("10,000");
+        assertThat(section(page, "Feeding").monthTotalProperty().get()).isEqualTo(Ugx.of(10_000));
+        assertThat(section(page, "Feeding").termTotalProperty().get()).isEqualTo(Ugx.of(10_000));
+        summary.show(t(2026, 1));
+        assertThat(feedingOnPage2(summary, side).actual().month(1)).isEqualTo(Ugx.of(10_000));
+
+        page.editQuantity(line(section(page, "Feeding"), "Maize flour"), "3");
+        page.editPlan(section(page, "Feeding"), "40,000");
+
+        assertThat(line(section(page, "Feeding"), "Maize flour").amountTextProperty().get())
+                .isEqualTo("15,000");
+        assertThat(section(page, "Feeding").monthTotalProperty().get()).isEqualTo(Ugx.of(15_000));
+        assertThat(section(page, "Feeding").planTextProperty().get()).isEqualTo("40,000");
+        summary.show(t(2026, 1));
+        assertThat(feedingOnPage2(summary, side).actual().month(1)).isEqualTo(Ugx.of(15_000));
+        assertThat(feedingOnPage2(summary, side).planned()).isEqualTo(Ugx.of(40_000));
     }
 }

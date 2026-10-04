@@ -1,6 +1,5 @@
 package org.angelscare.management.student.repository;
 
-import static org.angelscare.management.common.SyncedTable.LIVE;
 import static org.angelscare.management.common.SyncedTable.columns;
 
 import java.sql.ResultSet;
@@ -10,7 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.angelscare.management.calendar.model.TermRef;
 import org.angelscare.management.common.SyncedTable;
+import org.angelscare.management.student.model.Boarding;
 import org.angelscare.management.student.model.Residency;
 import org.angelscare.management.student.model.SchoolClass;
 import org.angelscare.management.student.model.Student;
@@ -23,9 +24,17 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class StudentRepository {
 
-    private static final String SELECT = "SELECT id, first_name, last_name, admission_no,"
-            + " school_class, residency, status FROM student WHERE " + LIVE;
-    private static final String ORDER = " ORDER BY lower(last_name), lower(first_name), id";
+    /** The joined and last terms come back as year and number, like every other term. */
+    private static final String SELECT = "SELECT s.id, s.first_name, s.last_name, s.admission_no,"
+            + " s.school_class, s.residency, s.status, s.boarding,"
+            + " jy.year AS joined_year, jt.number AS joined_number,"
+            + " ly.year AS last_year, lt.number AS last_number FROM student s"
+            + " LEFT JOIN term jt ON jt.id = s.joined_term_id"
+            + " LEFT JOIN school_year jy ON jy.id = jt.school_year_id"
+            + " LEFT JOIN term lt ON lt.id = s.left_term_id"
+            + " LEFT JOIN school_year ly ON ly.id = lt.school_year_id"
+            + " WHERE s.deleted_at IS NULL";
+    private static final String ORDER = " ORDER BY lower(s.last_name), lower(s.first_name), s.id";
 
     private final JdbcTemplate jdbc;
     private final SyncedTable table;
@@ -45,8 +54,17 @@ public class StudentRepository {
         table.update(id, detailColumns(details));
     }
 
-    public void updateStatus(String id, StudentStatus status) {
-        table.update(id, columns("status", status.name()));
+    public void updateBoarding(String id, Boarding boarding) {
+        table.update(id, columns("boarding", boarding.name()));
+    }
+
+    public void updateJoinedTerm(String id, String termId) {
+        table.update(id, columns("joined_term_id", termId));
+    }
+
+    /** {@code lastTermId} is the Left student's last term, and null for Active. */
+    public void updateStatus(String id, StudentStatus status, String lastTermId) {
+        table.update(id, columns("status", status.name(), "left_term_id", lastTermId));
     }
 
     public void softDelete(String id) {
@@ -54,7 +72,8 @@ public class StudentRepository {
     }
 
     public Optional<Student> findById(String id) {
-        return jdbc.query(SELECT + " AND id = ?", StudentRepository::map, id).stream().findFirst();
+        return jdbc.query(SELECT + " AND s.id = ?", StudentRepository::map, id).stream()
+                .findFirst();
     }
 
     public List<Student> findAll() {
@@ -66,11 +85,11 @@ public class StudentRepository {
         StringBuilder sql = new StringBuilder(SELECT);
         List<Object> args = new ArrayList<>();
         if (filter.schoolClass() != null) {
-            sql.append(" AND school_class = ?");
+            sql.append(" AND s.school_class = ?");
             args.add(filter.schoolClass().name());
         }
         if (filter.status() != null) {
-            sql.append(" AND status = ?");
+            sql.append(" AND s.status = ?");
             args.add(filter.status().name());
         }
         return jdbc.query(sql + ORDER, StudentRepository::map, args.toArray());
@@ -79,7 +98,7 @@ public class StudentRepository {
     /** Another live student already holding this admission number (any case). */
     public Optional<Student> findByAdmissionNo(String admissionNo, String excludeId) {
         return table.findClash("admission_no", admissionNo, excludeId, null, null)
-                .flatMap(stored -> jdbc.query(SELECT + " AND admission_no = ?",
+                .flatMap(stored -> jdbc.query(SELECT + " AND s.admission_no = ?",
                         StudentRepository::map, stored).stream().findFirst());
     }
 
@@ -100,6 +119,14 @@ public class StudentRepository {
                 row.getString("admission_no"),
                 SchoolClass.valueOf(row.getString("school_class")),
                 Residency.valueOf(row.getString("residency")),
-                StudentStatus.valueOf(row.getString("status")));
+                StudentStatus.valueOf(row.getString("status")),
+                Boarding.valueOf(row.getString("boarding")),
+                term(row, "joined_year", "joined_number"),
+                term(row, "last_year", "last_number"));
+    }
+
+    private static TermRef term(ResultSet row, String year, String number) throws SQLException {
+        int y = row.getInt(year);
+        return row.wasNull() ? null : TermRef.of(y, row.getInt(number));
     }
 }

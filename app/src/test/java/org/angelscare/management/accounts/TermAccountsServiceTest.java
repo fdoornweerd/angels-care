@@ -8,7 +8,9 @@ import org.angelscare.management.accounts.model.TermSummary;
 import org.angelscare.management.accounts.model.YearTotals;
 import org.angelscare.management.common.MonthlyAmounts;
 import org.angelscare.management.common.Ugx;
+import org.angelscare.management.student.model.Residency;
 import org.angelscare.management.student.model.SchoolClass;
+import org.angelscare.management.student.model.StudentEdit;
 import org.angelscare.management.student.model.StudentStatus;
 import org.angelscare.management.support.FinanceTest;
 import org.junit.jupiter.api.DisplayName;
@@ -119,13 +121,14 @@ class TermAccountsServiceTest extends FinanceTest {
         createYear(2026);
         var amina = createStudent("Amina", "Nakato", SchoolClass.P7);
         var brian = createStudent("Brian", "Okello", SchoolClass.P7);
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000),
+        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
                 Ugx.of(10_000));
         finance.studentAccounts.openTerm(t(2026, 1));
         finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 1, Ugx.of(100_000));
         finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 2, Ugx.of(50_000));
         finance.studentAccounts.setPayment(brian.id(), t(2026, 1), 2, Ugx.of(310_000));
-        finance.students.setStatus(brian.id(), StudentStatus.LEFT);
+        finance.studentAccounts.editStudent(brian.id(), t(2026, 1), new StudentEdit("Brian",
+                "Okello", Residency.NATIONAL, t(2026, 1), StudentStatus.LEFT));
 
         SummaryRow students = finance.accounts.summary(t(2026, 1)).income().get(0);
 

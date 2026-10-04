@@ -15,13 +15,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ClassFeeRepository {
 
-    /** A stored class fee and the term it applies from. */
+    /** A stored class fee and the term it applies from; {@code amount} is the Day fee. */
     public record Row(String id, SchoolClass schoolClass, String termId, TermRef term, long amount,
-            long ream) {
+            long boardingAmount, long ream) {
     }
 
     private static final String SELECT = "SELECT f.id, f.school_class, f.term_id, y.year,"
-            + " t.number, f.amount, f.ream FROM class_fee f"
+            + " t.number, f.amount, f.boarding_amount, f.ream FROM class_fee f"
             + " JOIN term t ON t.id = f.term_id JOIN school_year y ON y.id = t.school_year_id"
             + " WHERE f.deleted_at IS NULL AND t.deleted_at IS NULL AND y.deleted_at IS NULL";
 
@@ -38,7 +38,7 @@ public class ClassFeeRepository {
         return jdbc.query(SELECT, (row, n) -> new Row(row.getString("id"),
                 SchoolClass.valueOf(row.getString("school_class")), row.getString("term_id"),
                 TermRef.of(row.getInt("year"), row.getInt("number")), row.getLong("amount"),
-                row.getLong("ream")));
+                row.getLong("boarding_amount"), row.getLong("ream")));
     }
 
     public Optional<Row> find(SchoolClass schoolClass, String termId) {
@@ -47,12 +47,14 @@ public class ClassFeeRepository {
                 .findFirst();
     }
 
-    public void insert(SchoolClass schoolClass, String termId, long amount, long ream) {
+    public void insert(SchoolClass schoolClass, String termId, long amount, long boardingAmount,
+            long ream) {
         table.insert(columns("school_class", schoolClass.name(), "term_id", termId,
-                "amount", amount, "ream", ream));
+                "amount", amount, "boarding_amount", boardingAmount, "ream", ream));
     }
 
-    public void update(String id, long amount, long ream) {
-        table.update(id, columns("amount", amount, "ream", ream));
+    public void update(String id, long amount, long boardingAmount, long ream) {
+        table.update(id, columns("amount", amount, "boarding_amount", boardingAmount,
+                "ream", ream));
     }
 }

@@ -61,7 +61,8 @@ class PagesConfig {
     }
 
     @Bean
-    StudentsViewModel studentsViewModel(StudentAccountService accounts, ConfirmDialogs dialogs) {
-        return new StudentsViewModel(accounts, dialogs);
+    StudentsViewModel studentsViewModel(StudentAccountService accounts, CalendarService calendar,
+            ConfirmDialogs dialogs) {
+        return new StudentsViewModel(accounts, calendar, dialogs);
     }
 }

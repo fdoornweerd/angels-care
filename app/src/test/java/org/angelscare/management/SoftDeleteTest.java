@@ -46,7 +46,7 @@ class SoftDeleteTest extends FinanceTest {
         assertThat(finance.expenses.listCategories(2026)).isEmpty();
         assertThat(finance.incomeSheet.monthEntries(t(2026, 1), 1)).isEmpty();
         assertThat(finance.incomeSheet.plan(e.incomeCategory().id(), t(2026, 1))).isEmpty();
-        assertThat(finance.studentAccounts.lines(t(2026, 1), true)).isEmpty();
+        assertThat(finance.studentAccounts.lines(t(2026, 1))).isEmpty();
     }
 
     @Test

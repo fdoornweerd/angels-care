@@ -87,6 +87,7 @@ public class DetailViewModel {
         private final ReadOnlyObjectWrapper<Ugx> monthTotal = new ReadOnlyObjectWrapper<>(Ugx.ZERO);
         private final ReadOnlyObjectWrapper<Ugx> termTotal = new ReadOnlyObjectWrapper<>(Ugx.ZERO);
         private final ReadOnlyStringWrapper planText = new ReadOnlyStringWrapper("");
+        private final ReadOnlyObjectWrapper<Cell> invalidAddField = new ReadOnlyObjectWrapper<>();
 
         public CategorySection(Catalog.Category category) {
             this.category = category;
@@ -111,6 +112,11 @@ public class DetailViewModel {
         /** The Expected/Budgeted amount as shown, blank when not set. */
         public ReadOnlyStringProperty planTextProperty() {
             return planText.getReadOnlyProperty();
+        }
+
+        /** The add row's field (quantity or rate) whose text could not be read, or null. */
+        public ReadOnlyObjectProperty<Cell> invalidAddFieldProperty() {
+            return invalidAddField.getReadOnlyProperty();
         }
     }
 
@@ -229,7 +235,31 @@ public class DetailViewModel {
     }
 
     public boolean addItem(CategorySection section, String name, String unit) {
-        return change(() -> catalog.createItem(section.category().id(), name, unit));
+        return addItem(section, name, unit, "", "");
+    }
+
+    /**
+     * Adds an item, with its quantity and rate (each optional) for the selected month. If either
+     * can't be read, nothing is added and that field is marked.
+     */
+    public boolean addItem(CategorySection section, String name, String unit, String quantityText,
+            String rateText) {
+        section.invalidAddField.set(null);
+        Quantity quantity;
+        Ugx rate;
+        try {
+            quantity = quantityText == null || quantityText.isBlank() ? null
+                    : Quantity.parse(quantityText);
+        } catch (ValidationException e) {
+            return invalidAdd(section, Cell.QUANTITY, "Quantity: " + e.getMessage());
+        }
+        try {
+            rate = rateText == null || rateText.isBlank() ? null : UgxField.parse(rateText);
+        } catch (ValidationException e) {
+            return invalidAdd(section, Cell.RATE, "Rate: " + e.getMessage());
+        }
+        return change(() -> sheet.addItem(catalog, section.category().id(), name, unit, term,
+                month.get(), quantity, rate));
     }
 
     public boolean editItem(ItemLine line, String name, String unit) {
@@ -305,6 +335,12 @@ public class DetailViewModel {
         line.show(saved);
         sections.stream().filter(s -> s.lines.contains(line)).findFirst().ifPresent(this::showTotals);
         return true;
+    }
+
+    private boolean invalidAdd(CategorySection section, Cell field, String message) {
+        section.invalidAddField.set(field);
+        error.set(message);
+        return false;
     }
 
     private boolean invalid(ItemLine line, Cell cell, ValidationException e) {

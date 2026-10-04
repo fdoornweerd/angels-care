@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.angelscare.management.student.model.StudentEdit;
 import org.angelscare.management.student.model.StudentStatus;
 import org.angelscare.management.support.FinanceTables;
 import org.angelscare.management.support.FinanceTest;
@@ -60,7 +61,9 @@ class SyncColumnsTest extends FinanceTest {
         Instant later = clock.instant();
 
         finance.expenses.renameCategory(everything.expenseCategory().id(), "Food");
-        finance.students.setStatus(everything.student().id(), StudentStatus.LEFT);
+        finance.studentAccounts.editStudent(everything.student().id(), t(2026, 1),
+                new StudentEdit(everything.student().firstName(), everything.student().lastName(),
+                        everything.student().residency(), t(2026, 1), StudentStatus.LEFT));
 
         String categoryId = everything.expenseCategory().id();
         assertThat(timestampOf("expense_category", "updated_at", categoryId)).isEqualTo(later);
