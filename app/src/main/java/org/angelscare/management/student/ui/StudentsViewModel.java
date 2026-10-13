@@ -30,7 +30,7 @@ import org.angelscare.management.student.service.StudentAccountService;
 
 /**
  * Page 5: the students of a term, one table per class (Nursery, then Primary). An edit to one
- * student replaces just their line; class fee edits and added, edited or removed students reload.
+ * student replaces just their line; class ream edits and added, edited or removed students reload.
  */
 public class StudentsViewModel {
 
@@ -130,7 +130,7 @@ public class StudentsViewModel {
         return pageTotals.getReadOnlyProperty();
     }
 
-    /** Blank clears the student's own amount (back to the class fee). */
+    /** This term only; blank is refused (type 0 for none). */
     public boolean editAmount(StudentTermLine line, String text) {
         return edit(line, text, UgxField::parse,
                 amount -> accounts.setAmount(line.studentId(), term, amount));
@@ -161,35 +161,26 @@ public class StudentsViewModel {
         return save(line, () -> accounts.setRemarks(line.studentId(), term, text));
     }
 
-    public boolean editClassFee(ClassSection section, String text) {
-        ClassFee fee = section.fee.get();
-        return editClass(section, text, amount -> accounts.setClassFee(section.schoolClass, term,
-                amount, fee.boardingFee(), fee.ream()));
-    }
-
-    public boolean editClassBoardingFee(ClassSection section, String text) {
-        ClassFee fee = section.fee.get();
-        return editClass(section, text, boardingFee -> accounts.setClassFee(section.schoolClass,
-                term, fee.amount(), boardingFee, fee.ream()));
-    }
-
+    /** From this term on, until changed in a later term; blank is 0. */
     public boolean editClassReam(ClassSection section, String text) {
-        ClassFee fee = section.fee.get();
-        return editClass(section, text, ream -> accounts.setClassFee(section.schoolClass, term,
-                fee.amount(), fee.boardingFee(), ream));
+        return editClass(section, text,
+                ream -> accounts.setClassReam(section.schoolClass, term, ream));
     }
 
-    /** A Day student. */
+    /** Add student with the amount typed in; blank is refused. */
     public boolean addStudent(SchoolClass schoolClass, String firstName, String lastName,
-            Residency residency) {
-        return addStudent(schoolClass, firstName, lastName, residency, Boarding.DAY);
-    }
-
-    public boolean addStudent(SchoolClass schoolClass, String firstName, String lastName,
-            Residency residency, Boarding boarding) {
+            Residency residency, Boarding boarding, String amount) {
         error.set("");
+        Ugx parsed;
         try {
-            accounts.addStudent(term, firstName, lastName, schoolClass, residency, boarding);
+            parsed = amount == null || amount.isBlank() ? null : UgxField.parse(amount);
+        } catch (Exception e) {
+            error.set("Amount: " + ErrorMessages.forException(e));
+            return false;
+        }
+        try {
+            accounts.addStudent(term, firstName, lastName, schoolClass, residency, boarding,
+                    parsed);
         } catch (Exception e) {
             error.set(ErrorMessages.forException(e));
             return false;
@@ -301,7 +292,7 @@ public class StudentsViewModel {
     /** The totals row shown under a class's students, in the same columns. */
     private static StudentTermLine totalsRow(SchoolClass schoolClass, RegisterTotals totals) {
         return new StudentTermLine(null, "Total", null, false, schoolClass, null, totals.amount(),
-                false, totals.debt(), false, totals.ream(), false, totals.paid().first(),
+                totals.debt(), false, totals.ream(), false, totals.paid().first(),
                 totals.paid().second(), totals.paid().third(), null);
     }
 }

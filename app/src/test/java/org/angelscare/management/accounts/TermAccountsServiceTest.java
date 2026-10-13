@@ -121,9 +121,10 @@ class TermAccountsServiceTest extends FinanceTest {
         createYear(2026);
         var amina = createStudent("Amina", "Nakato", SchoolClass.P7);
         var brian = createStudent("Brian", "Okello", SchoolClass.P7);
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
-                Ugx.of(10_000));
+        finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 1), Ugx.of(10_000));
         finance.studentAccounts.openTerm(t(2026, 1));
+        finance.studentAccounts.setAmount(amina.id(), t(2026, 1), Ugx.of(300_000));
+        finance.studentAccounts.setAmount(brian.id(), t(2026, 1), Ugx.of(300_000));
         finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 1, Ugx.of(100_000));
         finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 2, Ugx.of(50_000));
         finance.studentAccounts.setPayment(brian.id(), t(2026, 1), 2, Ugx.of(310_000));

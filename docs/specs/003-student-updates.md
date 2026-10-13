@@ -355,6 +355,14 @@ Recommendations accepted at approval:
   lines carry into later debt. Correct them with *Remove from this term* (when there are no
   payments) and the Joined term in Edit student.
 
+## Changed later
+**Spec 004 (typed amounts, 2026-10-12)** removed the **Day fee and Boarding fee** from the class
+headings (Behaviour 3 and 4). Each student's Amount is typed in Add student and copied once to
+the next terms they're put on; Day/Boarding is still recorded per term but no longer changes the
+Amount. The tests for AC-2 and for "an Amount typed in stays when they switch" (AC-4) were
+removed; 004's AC-2, AC-3 and AC-10 replace them. `class_fee.boarding_amount` stays in the
+schema, unused.
+
 ## Out of scope
 - Editing a student's class, or the class recorded on a term.
 - Promoting a class.

@@ -96,9 +96,6 @@ class StudentsController implements PageController {
         name.getStyleClass().add("section-title");
         name.setMinWidth(70);
         HBox header = new HBox(12, name,
-                new Label("Day fee (UGX)"), feeField(section, ClassFee::amount, page::editClassFee),
-                new Label("Boarding fee (UGX)"),
-                feeField(section, ClassFee::boardingFee, page::editClassBoardingFee),
                 new Label("Ream (UGX)"), feeField(section, ClassFee::ream, page::editClassReam));
         header.setAlignment(Pos.CENTER_LEFT);
 
@@ -147,16 +144,21 @@ class StudentsController implements PageController {
                 FXCollections.observableArrayList(Boarding.values()));
         boarding.setConverter(Choices.BOARDING);
         boarding.setValue(Boarding.DAY);
+        TextField amount = new TextField();
+        amount.setPromptText("Amount (UGX)");
+        amount.setPrefColumnCount(8);
+        amount.setAlignment(Pos.CENTER_RIGHT);
         Button add = new Button("Add student to " + schoolClass.label());
         add.setMinWidth(Region.USE_PREF_SIZE);
         add.setOnAction(event -> {
             if (page.addStudent(schoolClass, first.getText(), last.getText(), residency.getValue(),
-                    boarding.getValue())) {
+                    boarding.getValue(), amount.getText())) {
                 first.clear();
                 last.clear();
+                amount.clear();
             }
         });
-        HBox addRow = new HBox(8, first, last, residency, boarding, add);
+        HBox addRow = new HBox(8, first, last, residency, boarding, amount, add);
         addRow.setAlignment(Pos.CENTER_LEFT);
 
         VBox box = new VBox(8, header, table, addRow);
@@ -164,7 +166,7 @@ class StudentsController implements PageController {
         return box;
     }
 
-    /** A class fee field in the heading; saved when left, if it changed. */
+    /** The class ream field in the heading; saved when left, if it changed. */
     private TextField feeField(ClassSection section, Function<ClassFee, Ugx> fee,
             BiPredicate<ClassSection, String> save) {
         TextField field = moneyField(fee.apply(section.feeProperty().get()));

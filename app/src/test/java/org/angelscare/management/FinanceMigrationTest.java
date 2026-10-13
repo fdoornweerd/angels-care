@@ -4,11 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.angelscare.management.calendar.model.TermRef;
+import org.angelscare.management.common.Ugx;
 import org.angelscare.management.db.SqliteDataSources;
+import org.angelscare.management.student.model.StudentTermLine;
+import org.angelscare.management.support.Finance;
 import org.angelscare.management.support.FinanceTables;
+import org.angelscare.management.support.MutableClock;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -173,7 +179,8 @@ class FinanceMigrationTest {
             List<Map<String, Object>> lines = jdbc.queryForList(STUDENT_TERM_V3);
             List<Map<String, Object>> fees = jdbc.queryForList(CLASS_FEE_V3);
 
-            Flyway.configure().dataSource(dataSource).load().migrate();
+            // To V4 only: V5 (spec 004) writes amounts onto lines, which AC-1 (004) checks.
+            Flyway.configure().dataSource(dataSource).target("4").load().migrate();
 
             assertThat(columnNames(jdbc, "student"))
                     .contains("boarding", "joined_term_id", "left_term_id");
@@ -211,6 +218,88 @@ class FinanceMigrationTest {
         } finally {
             ((AutoCloseable) dataSource).close();
         }
+    }
+
+    @Test
+    @DisplayName("AC-1 (004): V5 writes each line's class-fee amount onto it, and 0 Ream where none was set")
+    void upgradesFromV4() throws Exception {
+        DataSource dataSource = SqliteDataSources.create(tempDir.resolve("v4.db"));
+        try {
+            Flyway.configure().dataSource(dataSource).target("4").load().migrate();
+            JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+            jdbc.update("INSERT INTO school_year (id, year, created_at, updated_at)"
+                    + " VALUES ('y', 2026, 't', 't')");
+            jdbc.update("INSERT INTO term (id, school_year_id, number, start_date, end_date,"
+                    + " created_at, updated_at) VALUES"
+                    + " ('t1', 'y', 1, '2026-02-02', '2026-04-24', 't', 't'),"
+                    + " ('t2', 'y', 2, '2026-05-18', '2026-08-14', 't', 't'),"
+                    + " ('t3', 'y', 3, '2026-09-07', '2026-12-04', 't', 't')");
+            jdbc.update("INSERT INTO student (id, first_name, last_name, school_class, residency,"
+                    + " status, boarding, joined_term_id, created_at, updated_at) VALUES"
+                    + " ('day', 'Ann', 'Akello', 'P7', 'NATIONAL', 'ACTIVE', 'DAY', 't1', 't', 't'),"
+                    + " ('boarder', 'Ben', 'Okello', 'P7', 'NATIONAL', 'ACTIVE', 'BOARDING', 't1',"
+                    + " 't', 't'),"
+                    + " ('typed', 'Cara', 'Nambi', 'P7', 'NATIONAL', 'ACTIVE', 'DAY', 't1', 't', 't'),"
+                    + " ('p3', 'Dan', 'Mugisha', 'P3', 'NATIONAL', 'ACTIVE', 'DAY', 't1', 't', 't')");
+            // P7: Day 300,000 / Boarding 500,000 / Ream 10,000 from Term 1; Day 320,000 from
+            // Term 2. P3 has no fees.
+            jdbc.update("INSERT INTO class_fee (id, school_class, term_id, amount, boarding_amount,"
+                    + " ream, created_at, updated_at) VALUES"
+                    + " ('f1', 'P7', 't1', 300000, 500000, 10000, 't', 't'),"
+                    + " ('f2', 'P7', 't2', 320000, 500000, 10000, 't', 't')");
+            jdbc.update("INSERT INTO student_term (id, student_id, term_id, school_class, boarding,"
+                    + " amount, paid_1, created_at, updated_at, deleted_at) VALUES"
+                    + " ('d1', 'day', 't1', 'P7', 'DAY', NULL, 100000, 't', 't', NULL),"
+                    + " ('d2', 'day', 't2', 'P7', 'DAY', NULL, NULL, 't', 't', NULL),"
+                    + " ('d3', 'day', 't3', 'P7', 'DAY', NULL, NULL, 't', 't', 'removed'),"
+                    + " ('b1', 'boarder', 't1', 'P7', 'BOARDING', NULL, NULL, 't', 't', NULL),"
+                    + " ('b2', 'boarder', 't2', 'P7', 'BOARDING', NULL, NULL, 't', 't', NULL),"
+                    + " ('c1', 'typed', 't1', 'P7', 'DAY', 250000, NULL, 't', 't', NULL),"
+                    + " ('p1', 'p3', 't1', 'P3', 'DAY', NULL, NULL, 't', 't', NULL)");
+
+            Flyway.configure().dataSource(dataSource).load().migrate();
+
+            assertThat(lineColumn(jdbc, "amount", "d1")).isEqualTo("300000");
+            assertThat(lineColumn(jdbc, "amount", "d2")).isEqualTo("320000");
+            assertThat(lineColumn(jdbc, "amount", "b1")).isEqualTo("500000");
+            assertThat(lineColumn(jdbc, "amount", "b2")).isEqualTo("500000");
+            assertThat(lineColumn(jdbc, "amount", "c1")).isEqualTo("250000");
+            assertThat(lineColumn(jdbc, "amount", "p1")).isEqualTo("0");
+            assertThat(lineColumn(jdbc, "ream", "p1")).isEqualTo("0");
+            assertThat(lineColumn(jdbc, "ream", "d1")).as("follows the class Ream").isNull();
+            assertThat(lineColumn(jdbc, "ream", "c1")).isNull();
+            // The removed line is left alone, and only changed lines are stamped.
+            assertThat(lineColumn(jdbc, "amount", "d3")).isNull();
+            assertThat(lineColumn(jdbc, "updated_at", "d3")).isEqualTo("t");
+            assertThat(lineColumn(jdbc, "updated_at", "c1")).isEqualTo("t");
+            for (String changed : List.of("d1", "d2", "b1", "b2", "p1")) {
+                assertThat(lineColumn(jdbc, "updated_at", changed)).as(changed).isNotEqualTo("t");
+            }
+
+            // Every figure is what the class fees gave before V5.
+            Finance finance = new Finance(jdbc, new MutableClock(Instant.parse(
+                    "2026-03-02T08:00:00Z")));
+            assertThat(finance.studentAccounts.line("day", TermRef.of(2026, 1)).balance())
+                    .isEqualTo(Ugx.of(210_000));
+            StudentTermLine day2 = finance.studentAccounts.line("day", TermRef.of(2026, 2));
+            assertThat(day2.debt()).isEqualTo(Ugx.of(210_000));
+            assertThat(day2.total()).isEqualTo(Ugx.of(540_000));
+            assertThat(finance.studentAccounts.line("boarder", TermRef.of(2026, 2)).total())
+                    .isEqualTo(Ugx.of(1_020_000));
+            assertThat(finance.studentAccounts.line("p3", TermRef.of(2026, 1)).total())
+                    .isEqualTo(Ugx.ZERO);
+            assertThat(finance.studentAccounts.totals(TermRef.of(2026, 1)).expected())
+                    .isEqualTo(Ugx.of(310_000 + 510_000 + 260_000));
+            assertThat(finance.studentAccounts.totals(TermRef.of(2026, 2)).expected())
+                    .isEqualTo(Ugx.of(540_000 + 1_020_000));
+        } finally {
+            ((AutoCloseable) dataSource).close();
+        }
+    }
+
+    private static String lineColumn(JdbcTemplate jdbc, String column, String id) {
+        return jdbc.queryForObject("SELECT " + column + " FROM student_term WHERE id = ?",
+                String.class, id);
     }
 
     private static String studentColumn(JdbcTemplate jdbc, String column, String id) {

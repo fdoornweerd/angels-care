@@ -20,7 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Spec 002, page 5: the term register, class fees, debt, payments. */
+/** Spec 002, page 5: the term register, class reams, debt, payments (amounts typed: 004). */
 class StudentAccountServiceTest extends FinanceTest {
 
     @BeforeEach
@@ -34,8 +34,13 @@ class StudentAccountServiceTest extends FinanceTest {
     }
 
     private void p7Fees() {
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
-                Ugx.of(10_000));
+        finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 1), Ugx.of(10_000));
+    }
+
+    /** Opens Term 1 and types 300,000 as the student's amount there. */
+    private void onTerm1(Student student) {
+        finance.studentAccounts.openTerm(t(2026, 1));
+        finance.studentAccounts.setAmount(student.id(), t(2026, 1), Ugx.of(300_000));
     }
 
     @Nested
@@ -75,11 +80,10 @@ class StudentAccountServiceTest extends FinanceTest {
         @Test
         @DisplayName("AC-19: a student added on the page exists and is on the term once")
         void addStudent() {
-            finance.studentAccounts.setClassFee(SchoolClass.P3, t(2026, 1), Ugx.of(200_000), null,
-                    Ugx.of(5_000));
+            finance.studentAccounts.setClassReam(SchoolClass.P3, t(2026, 1), Ugx.of(6_000));
 
             Student brian = finance.studentAccounts.addStudent(t(2026, 1), "Brian", "Okello",
-                    SchoolClass.P3, Residency.NATIONAL);
+                    SchoolClass.P3, Residency.NATIONAL, null, Ugx.of(200_000));
             finance.studentAccounts.openTerm(t(2026, 1));
 
             assertThat(finance.students.find(brian.id())).hasValueSatisfying(s -> {
@@ -90,11 +94,11 @@ class StudentAccountServiceTest extends FinanceTest {
             assertThat(finance.studentAccounts.lines(t(2026, 1))).singleElement()
                     .satisfies(line -> {
                         assertThat(line.amount()).isEqualTo(Ugx.of(200_000));
-                        assertThat(line.ream()).isEqualTo(Ugx.of(5_000));
-                        assertThat(line.amountOverridden()).isFalse();
+                        assertThat(line.ream()).isEqualTo(Ugx.of(6_000));
                     });
             assertThatThrownBy(() -> finance.studentAccounts.addStudent(t(2026, 1), " ", "Okello",
-                    SchoolClass.P3, Residency.NATIONAL)).isInstanceOf(ValidationException.class);
+                    SchoolClass.P3, Residency.NATIONAL, null, Ugx.of(200_000)))
+                    .isInstanceOf(ValidationException.class);
         }
 
         @Test
@@ -136,50 +140,48 @@ class StudentAccountServiceTest extends FinanceTest {
     class ClassFees {
 
         @Test
-        @DisplayName("AC-17: a class fee carries forward into later terms and years until changed")
+        @DisplayName("AC-17: a class ream carries forward into later terms and years until changed")
         void carriesForward() {
             p7Fees();
 
-            ClassFee p7 = new ClassFee(SchoolClass.P7, Ugx.of(300_000), Ugx.ZERO,
-                    Ugx.of(10_000));
+            ClassFee p7 = new ClassFee(SchoolClass.P7, Ugx.of(10_000));
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 1))).isEqualTo(p7);
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 2))).isEqualTo(p7);
             assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2027, 1))).isEqualTo(p7);
 
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(320_000), null,
-                    Ugx.of(10_000));
+            finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 3), Ugx.of(12_000));
 
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 2)).amount())
-                    .isEqualTo(Ugx.of(300_000));
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 3)).amount())
-                    .isEqualTo(Ugx.of(320_000));
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2027, 1)).amount())
-                    .isEqualTo(Ugx.of(320_000));
+            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 2)).ream())
+                    .isEqualTo(Ugx.of(10_000));
+            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 3)).ream())
+                    .isEqualTo(Ugx.of(12_000));
+            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2027, 1)).ream())
+                    .isEqualTo(Ugx.of(12_000));
         }
 
         @Test
-        @DisplayName("AC-17: a class with no fee ever set gets 0; negative fees are refused")
+        @DisplayName("AC-17: a class with no ream ever set gets 5,000 (004); a negative ream is refused")
         void noFee() {
             assertThat(finance.studentAccounts.classFee(SchoolClass.P1, t(2026, 2)))
-                    .isEqualTo(new ClassFee(SchoolClass.P1, Ugx.ZERO, Ugx.ZERO, Ugx.ZERO));
-            assertThatThrownBy(() -> finance.studentAccounts.setClassFee(SchoolClass.P1, t(2026, 1),
-                    Ugx.of(-1), null, Ugx.ZERO)).isInstanceOf(ValidationException.class);
+                    .isEqualTo(new ClassFee(SchoolClass.P1, Ugx.of(5_000)));
+            assertThatThrownBy(() -> finance.studentAccounts.setClassReam(SchoolClass.P1,
+                    t(2026, 1), Ugx.of(-1))).isInstanceOf(ValidationException.class);
         }
 
         @Test
-        @DisplayName("AC-17: students' amounts follow the class fee of their term")
+        @DisplayName("AC-17: students' ream follows the class ream of their term; their amount is their own")
         void studentsFollowClassFee() {
             Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
             p7Fees();
-            finance.studentAccounts.openTerm(t(2026, 1));
+            onTerm1(amina);
             finance.studentAccounts.openTerm(t(2026, 3));
 
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(320_000), null,
-                    Ugx.of(12_000));
+            finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 3), Ugx.of(12_000));
 
-            assertThat(line(amina, 2026, 1).amount()).isEqualTo(Ugx.of(300_000));
-            assertThat(line(amina, 2026, 3).amount()).isEqualTo(Ugx.of(320_000));
+            assertThat(line(amina, 2026, 1).ream()).isEqualTo(Ugx.of(10_000));
             assertThat(line(amina, 2026, 3).ream()).isEqualTo(Ugx.of(12_000));
+            assertThat(line(amina, 2026, 1).amount()).isEqualTo(Ugx.of(300_000));
+            assertThat(line(amina, 2026, 3).amount()).isEqualTo(Ugx.of(300_000));
         }
     }
 
@@ -191,7 +193,7 @@ class StudentAccountServiceTest extends FinanceTest {
         void totalsAndCarriedDebt() {
             Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
             p7Fees();
-            finance.studentAccounts.openTerm(t(2026, 1));
+            onTerm1(amina);
             finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 1, Ugx.of(100_000));
             finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 2, Ugx.of(50_000));
 
@@ -214,7 +216,7 @@ class StudentAccountServiceTest extends FinanceTest {
         void debtOverride() {
             Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
             p7Fees();
-            finance.studentAccounts.openTerm(t(2026, 1));
+            onTerm1(amina);
             finance.studentAccounts.openTerm(t(2026, 2));
 
             assertThat(finance.studentAccounts.setDebt(amina.id(), t(2026, 2), Ugx.of(100_000))
@@ -230,7 +232,7 @@ class StudentAccountServiceTest extends FinanceTest {
         void creditCarries() {
             Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
             p7Fees();
-            finance.studentAccounts.openTerm(t(2026, 1));
+            onTerm1(amina);
             finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 3, Ugx.of(340_000));
             finance.studentAccounts.openTerm(t(2026, 2));
 
@@ -242,16 +244,15 @@ class StudentAccountServiceTest extends FinanceTest {
         }
 
         @Test
-        @DisplayName("AC-18: a student's own amount and ream; clearing the amount returns the class fee")
+        @DisplayName("AC-18: a student's own amount and ream; clearing the amount is refused (004)")
         void amountAndReamOverrides() {
             Student amina = createStudent("Amina", "Nakato", SchoolClass.P7);
             p7Fees();
-            finance.studentAccounts.openTerm(t(2026, 1));
+            onTerm1(amina);
             finance.studentAccounts.openTerm(t(2026, 2));
 
             StudentTermLine discounted =
                     finance.studentAccounts.setAmount(amina.id(), t(2026, 1), Ugx.of(250_000));
-            assertThat(discounted.amountOverridden()).isTrue();
             assertThat(discounted.total()).isEqualTo(Ugx.of(260_000));
             // Term 2's carried debt follows the change.
             assertThat(line(amina, 2026, 2).debt()).isEqualTo(Ugx.of(260_000));
@@ -260,9 +261,9 @@ class StudentAccountServiceTest extends FinanceTest {
             assertThat(line(amina, 2026, 1).ream()).isEqualTo(Ugx.ZERO);
             assertThat(line(amina, 2026, 1).reamOverridden()).isTrue();
 
-            finance.studentAccounts.setAmount(amina.id(), t(2026, 1), null);
-            assertThat(line(amina, 2026, 1).amount()).isEqualTo(Ugx.of(300_000));
-            assertThat(line(amina, 2026, 1).amountOverridden()).isFalse();
+            assertThatThrownBy(() -> finance.studentAccounts.setAmount(amina.id(), t(2026, 1),
+                    null)).isInstanceOf(ValidationException.class);
+            assertThat(line(amina, 2026, 1).amount()).isEqualTo(Ugx.of(250_000));
         }
 
         @Test

@@ -11,11 +11,11 @@ import org.angelscare.management.accounts.model.SummaryRow;
 import org.angelscare.management.common.MonthlyAmounts;
 import org.angelscare.management.common.Ugx;
 import org.angelscare.management.student.model.Boarding;
-import org.angelscare.management.student.model.ClassFee;
 import org.angelscare.management.student.model.Level;
 import org.angelscare.management.student.model.RegisterTotals;
 import org.angelscare.management.student.model.Residency;
 import org.angelscare.management.student.model.SchoolClass;
+import org.angelscare.management.student.model.Student;
 import org.angelscare.management.student.model.StudentEdit;
 import org.angelscare.management.student.model.StudentStatus;
 import org.angelscare.management.student.model.StudentTermLine;
@@ -32,9 +32,14 @@ class StudentsViewModelTest extends ScreenTest {
     @BeforeEach
     void term() {
         createYear(2026);
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
-                Ugx.of(10_000));
+        finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 1), Ugx.of(10_000));
         page = studentsPage();
+    }
+
+    /** A Day student in P7 on Term 1, with an amount of 300,000. */
+    private Student addP7(String firstName, String lastName) {
+        return finance.studentAccounts.addStudent(t(2026, 1), firstName, lastName, SchoolClass.P7,
+                Residency.NATIONAL, Boarding.DAY, Ugx.of(300_000));
     }
 
     private StudentTermLine amina() {
@@ -44,12 +49,6 @@ class StudentsViewModelTest extends ScreenTest {
     private StudentTermLine student(String name) {
         return page.section(SchoolClass.P7).lines().stream()
                 .filter(l -> l.name().equals(name)).findFirst().orElseThrow();
-    }
-
-    /** P7 with a Boarding fee too: Day 300,000, Boarding 500,000, Ream 10,000. */
-    private void p7WithBoardingFee() {
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000),
-                Ugx.of(500_000), Ugx.of(10_000));
     }
 
     private static <T> T last(List<T> list) {
@@ -70,7 +69,7 @@ class StudentsViewModelTest extends ScreenTest {
     @Test
     @DisplayName("AC-16: one section per class, Nursery then Primary, with the term's students")
     void sections() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
+        addP7("Amina", "Nakato");
         createStudent("Ruth", "Akello", SchoolClass.TOP);
 
         page.show(t(2026, 1));
@@ -82,14 +81,14 @@ class StudentsViewModelTest extends ScreenTest {
         assertThat(page.section(SchoolClass.TOP).lines()).extracting(StudentTermLine::name)
                 .containsExactly("Ruth Akello");
         assertThat(page.section(SchoolClass.P1).lines()).isEmpty();
-        assertThat(page.section(SchoolClass.P7).feeProperty().get().amount())
-                .isEqualTo(Ugx.of(300_000));
+        assertThat(page.section(SchoolClass.P7).feeProperty().get().ream())
+                .isEqualTo(Ugx.of(10_000));
     }
 
     @Test
     @DisplayName("AC-18: typed amounts, debt (a minus is credit), payments and remarks are saved")
     void edits() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
+        addP7("Amina", "Nakato");
         page.show(t(2026, 1));
 
         assertThat(page.editAmount(amina(), "250,000")).isTrue();
@@ -105,8 +104,8 @@ class StudentsViewModelTest extends ScreenTest {
         assertThat(line.remarks()).isEqualTo("Pays late");
         assertThat(finance.studentAccounts.line(line.studentId(), t(2026, 1))).isEqualTo(line);
 
-        assertThat(page.editAmount(amina(), "")).isTrue();
-        assertThat(amina().amount()).isEqualTo(Ugx.of(300_000));
+        assertThat(page.editAmount(amina(), "")).isFalse();
+        assertThat(amina().amount()).isEqualTo(Ugx.of(250_000));
         assertThat(page.editPayment(amina(), 1, "")).isTrue();
         assertThat(amina().paid1()).isNull();
     }
@@ -114,7 +113,7 @@ class StudentsViewModelTest extends ScreenTest {
     @Test
     @DisplayName("AC-18: an unreadable amount names the student and saves nothing")
     void invalidEdit() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
+        addP7("Amina", "Nakato");
         page.show(t(2026, 1));
 
         assertThat(page.editPayment(amina(), 2, "abc")).isFalse();
@@ -128,39 +127,40 @@ class StudentsViewModelTest extends ScreenTest {
     }
 
     @Test
-    @DisplayName("AC-17/AC-18: class fee edits update the class's students and the totals")
+    @DisplayName("AC-17/AC-18: class ream edits update the class's students and the totals")
     void classFeeAndTotals() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
-        createStudent("Brian", "Okello", SchoolClass.P7);
+        addP7("Amina", "Nakato");
+        addP7("Brian", "Okello");
         page.show(t(2026, 1));
 
-        assertThat(page.editClassFee(page.section(SchoolClass.P7), "320,000")).isTrue();
         assertThat(page.editClassReam(page.section(SchoolClass.P7), "12,000")).isTrue();
         page.editPayment(amina(), 3, "100,000");
 
         ClassSection p7 = page.section(SchoolClass.P7);
-        assertThat(p7.lines()).extracting(StudentTermLine::amount)
-                .containsOnly(Ugx.of(320_000));
+        assertThat(p7.lines()).extracting(StudentTermLine::ream)
+                .containsOnly(Ugx.of(12_000));
         var totals = p7.totalsProperty().get();
-        assertThat(totals.amount()).isEqualTo(Ugx.of(640_000));
+        assertThat(totals.amount()).isEqualTo(Ugx.of(600_000));
         assertThat(totals.ream()).isEqualTo(Ugx.of(24_000));
-        assertThat(totals.total()).isEqualTo(Ugx.of(664_000));
+        assertThat(totals.total()).isEqualTo(Ugx.of(624_000));
         assertThat(totals.paid()).isEqualTo(new MonthlyAmounts(Ugx.ZERO, Ugx.ZERO,
                 Ugx.of(100_000)));
-        assertThat(totals.balance()).isEqualTo(Ugx.of(564_000));
+        assertThat(totals.balance()).isEqualTo(Ugx.of(524_000));
         assertThat(page.pageTotalsProperty().get()).isEqualTo(totals);
-        assertThat(page.editClassFee(p7, "lots")).isFalse();
+        assertThat(page.editClassReam(p7, "lots")).isFalse();
     }
 
     @Test
-    @DisplayName("AC-19: a student added in a class appears there with the class defaults")
+    @DisplayName("AC-19: a student added in a class appears there with the amount typed")
     void addStudent() {
         page.show(t(2026, 1));
 
-        assertThat(page.addStudent(SchoolClass.P7, "Amina", "Nakato", Residency.REFUGEE)).isTrue();
+        assertThat(page.addStudent(SchoolClass.P7, "Amina", "Nakato", Residency.REFUGEE,
+                Boarding.DAY, "300,000")).isTrue();
 
         assertThat(amina().amount()).isEqualTo(Ugx.of(300_000));
-        assertThat(page.addStudent(SchoolClass.P7, "", "Okello", Residency.NATIONAL)).isFalse();
+        assertThat(page.addStudent(SchoolClass.P7, "", "Okello", Residency.NATIONAL,
+                Boarding.DAY, "300,000")).isFalse();
         assertThat(page.error()).contains("First name");
         assertThat(page.section(SchoolClass.P7).lines()).hasSize(1);
     }
@@ -168,7 +168,7 @@ class StudentsViewModelTest extends ScreenTest {
     @Test
     @DisplayName("AC-22: removing asks first and is refused while there are payments")
     void removeFromTerm() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
+        addP7("Amina", "Nakato");
         page.show(t(2026, 1));
         page.editPayment(amina(), 1, "1,000");
         dialogs.answerConfirm(true).answerConfirm(false).answerConfirm(true);
@@ -189,47 +189,28 @@ class StudentsViewModelTest extends ScreenTest {
     }
 
     @Test
-    @DisplayName("AC-2 (003): the Boarding fee is edited on its own; Day fee and Ream edits keep it")
-    void boardingFeeHeading() {
-        page.show(t(2026, 1));
-
-        assertThat(page.editClassBoardingFee(page.section(SchoolClass.P7), "550,000")).isTrue();
-        ClassFee fee = page.section(SchoolClass.P7).feeProperty().get();
-        assertThat(fee.boardingFee()).isEqualTo(Ugx.of(550_000));
-        assertThat(fee.amount()).isEqualTo(Ugx.of(300_000));
-        assertThat(fee.ream()).isEqualTo(Ugx.of(10_000));
-
-        assertThat(page.editClassFee(page.section(SchoolClass.P7), "320,000")).isTrue();
-        assertThat(page.editClassReam(page.section(SchoolClass.P7), "12,000")).isTrue();
-        assertThat(page.section(SchoolClass.P7).feeProperty().get().boardingFee())
-                .isEqualTo(Ugx.of(550_000));
-        assertThat(page.editClassBoardingFee(page.section(SchoolClass.P7), "-1")).isFalse();
-    }
-
-    @Test
-    @DisplayName("AC-3/AC-4 (003): Add student as Boarding, then switch them in the Day/Boarding column")
+    @DisplayName("AC-3/AC-4 (003): Add student as Boarding, then switch them in the Day/Boarding column; the amount stays (004)")
     void boardingColumn() {
-        p7WithBoardingFee();
         page.show(t(2026, 1));
 
         assertThat(page.addStudent(SchoolClass.P7, "Amina", "Nakato", Residency.NATIONAL,
-                Boarding.BOARDING)).as(page.error()).isTrue();
+                Boarding.BOARDING, "500,000")).as(page.error()).isTrue();
         assertThat(amina().boarding()).isEqualTo(Boarding.BOARDING);
         assertThat(amina().amount()).isEqualTo(Ugx.of(500_000));
 
         assertThat(page.editBoarding(amina(), Boarding.DAY)).as(page.error()).isTrue();
 
         assertThat(amina().boarding()).isEqualTo(Boarding.DAY);
-        assertThat(amina().amount()).isEqualTo(Ugx.of(300_000));
+        assertThat(amina().amount()).isEqualTo(Ugx.of(500_000));
         assertThat(page.section(SchoolClass.P7).totalsProperty().get().amount())
-                .isEqualTo(Ugx.of(300_000));
+                .isEqualTo(Ugx.of(500_000));
     }
 
     @Test
     @DisplayName("AC-10 (003): Left students are listed, tagged, and counted; page 5 matches page 2")
     void leftStudentsAreCounted() {
-        var amina = createStudent("Amina", "Nakato", SchoolClass.P7);
-        createStudent("Brian", "Okello", SchoolClass.P7);
+        var amina = addP7("Amina", "Nakato");
+        addP7("Brian", "Okello");
         page.show(t(2026, 1));
         page.editPayment(amina(), 1, "100,000");
         finance.studentAccounts.editStudent(amina.id(), t(2026, 1), new StudentEdit("Amina",
@@ -250,8 +231,8 @@ class StudentsViewModelTest extends ScreenTest {
     @Test
     @DisplayName("AC-15: when a student's cell is edited, the class's totals row already has the new totals")
     void totalsRowFollowsEdits() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
-        createStudent("Brian", "Okello", SchoolClass.P7);
+        addP7("Amina", "Nakato");
+        addP7("Brian", "Okello");
         page.show(t(2026, 1));
         StudentsViewModel.ClassSection p7 = page.section(SchoolClass.P7);
         List<StudentTermLine> totalsRowWhenNotified = new ArrayList<>();
@@ -270,26 +251,26 @@ class StudentsViewModelTest extends ScreenTest {
         assertTotalsRow(last(totalsRowWhenNotified), p7.lines());
         page.editReam(amina(), "0");
         assertTotalsRow(last(totalsRowWhenNotified), p7.lines());
-        // P7 has no Boarding fee, so Brian's amount drops to 0.
         page.editBoarding(student("Brian Okello"), Boarding.BOARDING);
         assertTotalsRow(last(totalsRowWhenNotified), p7.lines());
-        assertThat(last(totalsRowWhenNotified).amount()).isEqualTo(Ugx.of(250_000));
+        assertThat(last(totalsRowWhenNotified).amount()).isEqualTo(Ugx.of(550_000));
         assertThat(last(p7.rows())).isEqualTo(last(totalsRowWhenNotified));
     }
 
     @Test
-    @DisplayName("AC-15: after a class fee change, Add student, Edit student and Remove, the totals row is current")
+    @DisplayName("AC-15: after a class ream change, Add student, Edit student and Remove, the totals row is current")
     void totalsRowAfterReloads() {
-        createStudent("Amina", "Nakato", SchoolClass.P7);
-        createStudent("Brian", "Okello", SchoolClass.P7);
+        addP7("Amina", "Nakato");
+        addP7("Brian", "Okello");
         page.show(t(2026, 1));
 
-        page.editClassFee(page.section(SchoolClass.P7), "320,000");
+        page.editClassReam(page.section(SchoolClass.P7), "12,000");
         assertTotalsRow(last(page.section(SchoolClass.P7).rows()),
                 page.section(SchoolClass.P7).lines());
-        assertThat(last(page.section(SchoolClass.P7).rows()).amount()).isEqualTo(Ugx.of(640_000));
+        assertThat(last(page.section(SchoolClass.P7).rows()).ream()).isEqualTo(Ugx.of(24_000));
 
-        page.addStudent(SchoolClass.P7, "Cara", "Nambi", Residency.NATIONAL, Boarding.DAY);
+        page.addStudent(SchoolClass.P7, "Cara", "Nambi", Residency.NATIONAL, Boarding.DAY,
+                "300,000");
         assertThat(page.section(SchoolClass.P7).rows()).hasSize(4);
         assertTotalsRow(last(page.section(SchoolClass.P7).rows()),
                 page.section(SchoolClass.P7).lines());
@@ -299,7 +280,7 @@ class StudentsViewModelTest extends ScreenTest {
         assertThat(editor.save()).as(editor.error()).isTrue();
         assertTotalsRow(last(page.section(SchoolClass.P7).rows()),
                 page.section(SchoolClass.P7).lines());
-        assertThat(last(page.section(SchoolClass.P7).rows()).amount()).isEqualTo(Ugx.of(960_000));
+        assertThat(last(page.section(SchoolClass.P7).rows()).amount()).isEqualTo(Ugx.of(900_000));
 
         dialogs.answerConfirm(true);
         assertThat(page.removeFromTerm(student("Cara Nambi"))).isTrue();
