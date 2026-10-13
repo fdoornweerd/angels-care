@@ -18,7 +18,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class StudentTermRepository {
 
-    /** A stored line; the nullable amounts are null while the default applies or while blank. */
+    /**
+     * A stored line; the nullable amounts are null while the default applies or while blank.
+     * {@code amount} is always set since V5.
+     */
     public record Row(String id, String studentId, String termId, TermRef term,
             SchoolClass schoolClass, Boarding boarding, Long amount, Long ream, Long debt,
             Long paid1, Long paid2, Long paid3, String remarks) {
@@ -74,9 +77,10 @@ public class StudentTermRepository {
     }
 
     public void insert(String studentId, String termId, SchoolClass schoolClass,
-            Boarding boarding) {
+            Boarding boarding, long amount) {
         table.insert(columns("student_id", studentId, "term_id", termId,
-                "school_class", schoolClass.name(), "boarding", boarding.name()));
+                "school_class", schoolClass.name(), "boarding", boarding.name(),
+                "amount", amount));
     }
 
     /** Sets one column (boarding, amount, ream, debt, paid_1-3, remarks) of a line. */

@@ -132,9 +132,9 @@ class DetailViewModelTest extends ScreenTest {
     @DisplayName("AC-12: the income page's Students row matches page 2's")
     void studentsRow() {
         var amina = createStudent("Amina", "Nakato", SchoolClass.P7);
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
-                Ugx.of(10_000));
+        finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 1), Ugx.of(10_000));
         finance.studentAccounts.openTerm(t(2026, 1));
+        finance.studentAccounts.setAmount(amina.id(), t(2026, 1), Ugx.of(300_000));
         finance.studentAccounts.setPayment(amina.id(), t(2026, 1), 2, Ugx.of(120_000));
 
         DetailViewModel page = incomePage();

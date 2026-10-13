@@ -370,6 +370,12 @@ Recommendations accepted at approval:
 - The class totals row is built by the view model (`ClassSection.rows()`); it used to lag one
   edit behind.
 
+**Spec 004 (typed amounts, 2026-10-12)** changed page 5 again:
+- **Classes have no fee any more, only a Ream** (carried forward as before; 5,000 if never set).
+  Each student's Amount is typed in Add student, copied once to the next terms they're put on,
+  and can't be cleared. AC-17's class fee tests now test the Ream, and AC-18's "clearing the
+  amount returns the class fee" now expects a refusal.
+
 ## Out of scope
 Student photos. Promoting a whole class to the next class. Printing, reports and exports. Receipts
 and exact payment dates (only which month). Groups and fee assignments (their code is removed;

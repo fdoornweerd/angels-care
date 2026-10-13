@@ -4,10 +4,11 @@ import org.angelscare.management.common.MonthlyAmounts;
 import org.angelscare.management.common.Ugx;
 
 /**
- * One student's line on page 5 for one term. {@code amount}, {@code debt} and {@code ream} are
- * the values in force (the student's own, or the class fee / carried balance); the flags say
- * whether they were typed for this student. Payments are null while blank. {@code left} says the
- * student had left by this term (it is their last term, or a later one they paid for).
+ * One student's line on page 5 for one term. {@code amount} is the student's own for the term;
+ * {@code debt} and {@code ream} are the values in force (typed for the student, or the carried
+ * balance / class ream); the flags say whether they were typed for this student. Payments are
+ * null while blank. {@code left} says the student had left by this term (it is their last term,
+ * or a later one they paid for).
  */
 public record StudentTermLine(
         String studentId,
@@ -17,7 +18,6 @@ public record StudentTermLine(
         SchoolClass schoolClass,
         Boarding boarding,
         Ugx amount,
-        boolean amountOverridden,
         Ugx debt,
         boolean debtOverridden,
         Ugx ream,

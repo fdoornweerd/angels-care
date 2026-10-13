@@ -30,14 +30,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Page 5: who is on a term's register, the class fees (carried forward until changed), each
- * student's amount, debt (carried from their previous term), ream, payments and remarks.
+ * Page 5: who is on a term's register, the class reams (carried forward until changed), each
+ * student's amount (typed in, then copied to the terms they're put on next), debt (carried from
+ * their previous term), ream, payments and remarks.
  */
 @Service
 @Transactional
 public class StudentAccountService {
 
     private static final int MAX_REMARKS_LENGTH = 500;
+
+    public static final String AMOUNT_REQUIRED = "Type the amount the student pays (0 for none).";
 
     private final StudentTermRepository terms;
     private final ClassFeeRepository classFees;
@@ -57,15 +60,17 @@ public class StudentAccountService {
 
     /**
      * Puts on the term every student who belongs to it (joined by then, and not left before it)
-     * and was never on it, under their class and Day/Boarding now. A student on no term yet joins
-     * this one. Students who joined later or left earlier are never added, so an earlier term
-     * keeps only the students who were there.
+     * and was never on it, under their class and Day/Boarding now, with the amount of their
+     * nearest term (see {@link #copiedAmount}). A student on no term yet joins this one.
+     * Students who joined later or left earlier are never added, so an earlier term keeps only
+     * the students who were there.
      */
     public void openTerm(TermRef term) {
         Term stored = calendar.requireTerm(term);
         for (Student student : studentRepository.findAll()) {
             if (student.belongsTo(term) && !terms.everOnTerm(student.id(), stored.id())) {
-                terms.insert(student.id(), stored.id(), student.schoolClass(), student.boarding());
+                terms.insert(student.id(), stored.id(), student.schoolClass(), student.boarding(),
+                        copiedAmount(student.id(), term));
                 if (student.joinedTerm() == null) {
                     studentRepository.updateJoinedTerm(student.id(), stored.id());
                 }
@@ -98,29 +103,21 @@ public class StudentAccountService {
         return requireStudent(studentId);
     }
 
-    /** The class fees in force in {@code term}: set in it or in the latest earlier term. */
+    /** The class ream in force in {@code term}: set in it or in the latest earlier term. */
     @Transactional(readOnly = true)
     public ClassFee classFee(SchoolClass schoolClass, TermRef term) {
         calendar.requireTerm(term);
         return new Register(List.of(), classFees.findAll(), Map.of()).classFee(schoolClass, term);
     }
 
-    /**
-     * Sets the class's Day fee, Boarding fee and ream from {@code term} on, until changed in a
-     * later term. A fee left null is 0.
-     */
-    public void setClassFee(SchoolClass schoolClass, TermRef term, Ugx dayFee, Ugx boardingFee,
-            Ugx ream) {
-        requireNotNegative(dayFee, "A class fee");
-        requireNotNegative(boardingFee, "A boarding fee");
+    /** Sets the class's ream from {@code term} on, until changed in a later term. */
+    public void setClassReam(SchoolClass schoolClass, TermRef term, Ugx ream) {
         requireNotNegative(ream, "A ream charge");
         Term stored = calendar.requireTerm(term);
-        long day = shillings(dayFee);
-        long boarding = shillings(boardingFee);
-        long reamShillings = shillings(ream);
+        long shillings = shillings(ream);
         classFees.find(schoolClass, stored.id()).ifPresentOrElse(
-                existing -> classFees.update(existing.id(), day, boarding, reamShillings),
-                () -> classFees.insert(schoolClass, stored.id(), day, boarding, reamShillings));
+                existing -> classFees.update(existing.id(), shillings),
+                () -> classFees.insert(schoolClass, stored.id(), shillings));
     }
 
     /**
@@ -143,10 +140,10 @@ public class StudentAccountService {
         return line(studentId, term);
     }
 
-    /** The student's own amount for the term; null goes back to the class fee. */
+    /** The student's own amount for the term only; required (0 allowed). */
     public StudentTermLine setAmount(String studentId, TermRef term, Ugx amount) {
-        requireNotNegative(amount, "An amount");
-        return set(studentId, term, "amount", amount == null ? null : amount.shillings());
+        requireAmount(amount);
+        return set(studentId, term, "amount", amount.shillings());
     }
 
     /** The student's debt for the term (may be negative: credit); null goes back to carried. */
@@ -177,18 +174,14 @@ public class StudentAccountService {
         return set(studentId, term, "remarks", clean);
     }
 
-    /** As the method below, for a Day student. */
-    public Student addStudent(TermRef term, String firstName, String lastName,
-            SchoolClass schoolClass, Residency residency) {
-        return addStudent(term, firstName, lastName, schoolClass, residency, null);
-    }
-
     /**
      * Creates an Active student in {@code schoolClass} who joined in {@code term}, and puts them
-     * on it. National and Day unless chosen otherwise.
+     * on it with {@code amount}, which is required (0 allowed). National and Day unless chosen
+     * otherwise.
      */
     public Student addStudent(TermRef term, String firstName, String lastName,
-            SchoolClass schoolClass, Residency residency, Boarding boarding) {
+            SchoolClass schoolClass, Residency residency, Boarding boarding, Ugx amount) {
+        requireAmount(amount);
         Term stored = calendar.requireTerm(term);
         Boarding chosen = boarding == null ? Boarding.DAY : boarding;
         Student created = students.create(StudentDetails.of(firstName, lastName, schoolClass,
@@ -197,7 +190,7 @@ public class StudentAccountService {
             studentRepository.updateBoarding(created.id(), chosen);
         }
         studentRepository.updateJoinedTerm(created.id(), stored.id());
-        terms.insert(created.id(), stored.id(), created.schoolClass(), chosen);
+        terms.insert(created.id(), stored.id(), created.schoolClass(), chosen, amount.shillings());
         return requireStudent(created.id());
     }
 
@@ -210,7 +203,8 @@ public class StudentAccountService {
      *     An earlier one lets those terms add them when opened.</li>
      * <li>Left makes {@code term} their last term (one they already had stays): they come off
      *     later terms they haven't paid for, and are never added to later terms.</li>
-     * <li>Active again clears the last term and puts them back on {@code term}.</li>
+     * <li>Active again clears the last term and puts them back on {@code term}, with the amount
+     *     of their nearest term.</li>
      * </ul>
      */
     public Student editStudent(String studentId, TermRef term, StudentEdit edit) {
@@ -258,7 +252,8 @@ public class StudentAccountService {
             studentRepository.updateStatus(studentId, StudentStatus.ACTIVE, null);
             if (joined.ref().compareTo(term) <= 0 && terms.find(studentId, viewed.id()).isEmpty()) {
                 Student back = requireStudent(studentId);
-                terms.insert(studentId, viewed.id(), back.schoolClass(), back.boarding());
+                terms.insert(studentId, viewed.id(), back.schoolClass(), back.boarding(),
+                        copiedAmount(studentId, term));
             }
         }
         return requireStudent(studentId);
@@ -285,6 +280,22 @@ public class StudentAccountService {
             paid = paid.plus(line.payments());
         }
         return new StudentsTotals(expected, paid);
+    }
+
+    /**
+     * The amount a student's new line on {@code term} starts with: that of their latest earlier
+     * term, else of their earliest later one, else 0. Copied once; each term is then its own.
+     */
+    private long copiedAmount(String studentId, TermRef term) {
+        List<Row> lines = terms.findByStudent(studentId);
+        return lines.stream()
+                .filter(row -> row.term().compareTo(term) < 0)
+                .max(Comparator.comparing(Row::term))
+                .or(() -> lines.stream()
+                        .filter(row -> row.term().compareTo(term) > 0)
+                        .min(Comparator.comparing(Row::term)))
+                .map(row -> row.amount() == null ? 0L : row.amount())
+                .orElse(0L);
     }
 
     private StudentTermLine set(String studentId, TermRef term, String column, Object value) {
@@ -325,6 +336,13 @@ public class StudentAccountService {
 
     private static long shillings(Ugx amount) {
         return amount == null ? 0 : amount.shillings();
+    }
+
+    private static void requireAmount(Ugx amount) {
+        if (amount == null) {
+            throw new ValidationException(AMOUNT_REQUIRED);
+        }
+        requireNotNegative(amount, "An amount");
     }
 
     private static void requireNotNegative(Ugx amount, String what) {

@@ -16,7 +16,7 @@ import org.angelscare.management.student.repository.StudentTermRepository.Row;
 
 /**
  * The page-5 arithmetic, done in memory from one read of the lines and class fees: which class
- * fee is in force in a term, and each student's debt carried from their previous term. Pure: no
+ * ream is in force in a term, and each student's debt carried from their previous term. Pure: no
  * database.
  */
 final class Register {
@@ -31,14 +31,16 @@ final class Register {
         this.students = students;
     }
 
-    /** The fee set in {@code term}, or in the latest earlier term; 0 if none was ever set. */
+    /** A class whose ream was never set charges this. */
+    static final Ugx DEFAULT_REAM = Ugx.of(5_000);
+
+    /** The ream set in {@code term}, or in the latest earlier term; 5,000 if never set. */
     ClassFee classFee(SchoolClass schoolClass, TermRef term) {
         return fees.stream()
                 .filter(fee -> fee.schoolClass() == schoolClass && fee.term().compareTo(term) <= 0)
                 .max(Comparator.comparing(ClassFeeRepository.Row::term))
-                .map(fee -> new ClassFee(schoolClass, Ugx.of(fee.amount()),
-                        Ugx.of(fee.boardingAmount()), Ugx.of(fee.ream())))
-                .orElse(new ClassFee(schoolClass, Ugx.ZERO, Ugx.ZERO, Ugx.ZERO));
+                .map(fee -> new ClassFee(schoolClass, Ugx.of(fee.ream())))
+                .orElse(new ClassFee(schoolClass, DEFAULT_REAM));
     }
 
     StudentTermLine line(Row row) {
@@ -51,8 +53,8 @@ final class Register {
                 hadLeft(student, row.term()),
                 row.schoolClass(),
                 row.boarding(),
-                row.amount() == null ? fee.feeFor(row.boarding()) : Ugx.of(row.amount()),
-                row.amount() != null,
+                // Always set since V5; a line without one owes no fee.
+                row.amount() == null ? Ugx.ZERO : Ugx.of(row.amount()),
                 row.debt() == null ? carriedDebt(row) : Ugx.of(row.debt()),
                 row.debt() != null,
                 row.ream() == null ? fee.ream() : Ugx.of(row.ream()),

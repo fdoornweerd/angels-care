@@ -24,7 +24,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/** Spec 003: Day and Boarding, who is on a term, Edit student, and earlier terms left alone. */
+/**
+ * Spec 003: Day and Boarding, who is on a term, Edit student, and earlier terms left alone. Spec
+ * 004 removed the Day and Boarding class fees: amounts are typed in, and its tests replace 003's
+ * AC-2 and the "typed amount stays" part of AC-4.
+ */
 class StudentUpdatesTest extends FinanceTest {
 
     @BeforeEach
@@ -47,27 +51,20 @@ class StudentUpdatesTest extends FinanceTest {
         return finance.students.find(student.id()).orElseThrow();
     }
 
-    /** P7: Day 300,000, Boarding 500,000 and Ream 10,000 from 2026-2027 Term 1. */
+    /** P7's Ream: 10,000 from 2026-2027 Term 1. */
     private void p7Fees() {
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000),
-                Ugx.of(500_000), Ugx.of(10_000));
+        finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 1), Ugx.of(10_000));
     }
 
-    /** P7 as before 003: a fee of 300,000 and ream of 10,000 from Term 1, no Boarding fee. */
-    private void p7DayFee() {
-        finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
-                Ugx.of(10_000));
-    }
-
-    /** "Add student" in P7 on the page of {@code year} Term {@code term}, as in 002. */
+    /** "Add student" in P7 on the page of {@code year} Term {@code term}, Day, 300,000. */
     private Student add(int year, int term, String firstName, String lastName) {
         return finance.studentAccounts.addStudent(t(year, term), firstName, lastName,
-                SchoolClass.P7, Residency.NATIONAL);
+                SchoolClass.P7, Residency.NATIONAL, Boarding.DAY, Ugx.of(300_000));
     }
 
     private Student addAs(Boarding boarding, String firstName, String lastName) {
         return finance.studentAccounts.addStudent(t(2026, 1), firstName, lastName, SchoolClass.P7,
-                Residency.NATIONAL, boarding);
+                Residency.NATIONAL, boarding, Ugx.of(300_000));
     }
 
     /** Edit student, saved on {@code year} Term {@code term}'s page, changing joined and status. */
@@ -97,69 +94,12 @@ class StudentUpdatesTest extends FinanceTest {
     class DayAndBoarding {
 
         @Test
-        @DisplayName("AC-2: Day and Boarding students get their class's Day or Boarding fee, carried forward")
-        void feesByBoarding() {
-            p7Fees();
-            Student day = addAs(Boarding.DAY, "Amina", "Nakato");
-            Student boarder = addAs(Boarding.BOARDING, "Brian", "Okello");
-            finance.studentAccounts.openTerm(t(2026, 2));
-            finance.studentAccounts.openTerm(t(2027, 1));
-
-            for (TermRef term : List.of(t(2026, 1), t(2026, 2), t(2027, 1))) {
-                StudentTermLine dayLine = finance.studentAccounts.line(day.id(), term);
-                StudentTermLine boarderLine = finance.studentAccounts.line(boarder.id(), term);
-                assertThat(dayLine.amount()).as(term.label()).isEqualTo(Ugx.of(300_000));
-                assertThat(boarderLine.amount()).as(term.label()).isEqualTo(Ugx.of(500_000));
-                assertThat(dayLine.ream()).as(term.label()).isEqualTo(Ugx.of(10_000));
-                assertThat(boarderLine.ream()).as(term.label()).isEqualTo(Ugx.of(10_000));
-            }
-        }
-
-        @Test
-        @DisplayName("AC-2: a Boarding fee changed in Term 3 applies from Term 3 on; Day fee and Ream stay")
-        void boardingFeeCarriesForward() {
-            p7Fees();
-
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 3), Ugx.of(300_000),
-                    Ugx.of(550_000), Ugx.of(10_000));
-
-            ClassFee term3 = finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 3));
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 2)).boardingFee())
-                    .isEqualTo(Ugx.of(500_000));
-            assertThat(term3.boardingFee()).isEqualTo(Ugx.of(550_000));
-            assertThat(term3.amount()).isEqualTo(Ugx.of(300_000));
-            assertThat(term3.ream()).isEqualTo(Ugx.of(10_000));
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2027, 1)).boardingFee())
-                    .isEqualTo(Ugx.of(550_000));
-        }
-
-        @Test
-        @DisplayName("AC-2: a class with no Boarding fee set charges Boarding students 0; negative is refused")
-        void noBoardingFee() {
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 1), Ugx.of(300_000), null,
-                    Ugx.of(10_000));
-            Student boarder = addAs(Boarding.BOARDING, "Brian", "Okello");
-
-            assertThat(line(boarder, 2026, 1).amount()).isEqualTo(Ugx.ZERO);
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 1)).boardingFee())
-                    .isEqualTo(Ugx.ZERO);
-            assertThat(finance.studentAccounts.classFee(SchoolClass.P1, t(2026, 1)).boardingFee())
-                    .isEqualTo(Ugx.ZERO);
-            assertThatThrownBy(() -> finance.studentAccounts.setClassFee(SchoolClass.P7,
-                    t(2026, 1), Ugx.of(300_000), Ugx.of(-1), Ugx.of(10_000)))
-                    .isInstanceOf(ValidationException.class);
-        }
-
-        @Test
         @DisplayName("AC-3: Add student with Boarding puts them on the term as Boarding; with no choice, Day")
         void addStudentWithBoarding() {
-            finance.studentAccounts.setClassFee(SchoolClass.P3, t(2026, 1), Ugx.of(200_000),
-                    Ugx.of(350_000), Ugx.of(5_000));
-
             Student brian = finance.studentAccounts.addStudent(t(2026, 1), "Brian", "Okello",
-                    SchoolClass.P3, Residency.NATIONAL, Boarding.BOARDING);
+                    SchoolClass.P3, Residency.NATIONAL, Boarding.BOARDING, Ugx.of(350_000));
             Student ruth = finance.studentAccounts.addStudent(t(2026, 1), "Ruth", "Akello",
-                    SchoolClass.P3, Residency.NATIONAL, null);
+                    SchoolClass.P3, Residency.NATIONAL, null, Ugx.of(200_000));
 
             assertThat(stored(brian).boarding()).isEqualTo(Boarding.BOARDING);
             assertThat(line(brian, 2026, 1).boarding()).isEqualTo(Boarding.BOARDING);
@@ -182,30 +122,12 @@ class StudentUpdatesTest extends FinanceTest {
                     Boarding.BOARDING);
 
             assertThat(term2.boarding()).isEqualTo(Boarding.BOARDING);
-            assertThat(term2.amount()).isEqualTo(Ugx.of(500_000));
             assertThat(line(amina, 2026, 3).boarding()).isEqualTo(Boarding.BOARDING);
-            assertThat(line(amina, 2026, 3).amount()).isEqualTo(Ugx.of(500_000));
             assertThat(line(amina, 2026, 1)).isEqualTo(term1);
             assertThat(line(amina, 2026, 1).boarding()).isEqualTo(Boarding.DAY);
             assertThat(stored(amina).boarding()).isEqualTo(Boarding.BOARDING);
             finance.studentAccounts.openTerm(t(2027, 1));
             assertThat(line(amina, 2027, 1).boarding()).isEqualTo(Boarding.BOARDING);
-        }
-
-        @Test
-        @DisplayName("AC-4: an Amount typed in for the student stays when they switch")
-        void typedAmountStays() {
-            p7Fees();
-            Student amina = addAs(Boarding.DAY, "Amina", "Nakato");
-            finance.studentAccounts.setAmount(amina.id(), t(2026, 1), Ugx.of(250_000));
-
-            StudentTermLine switched = finance.studentAccounts.setBoarding(amina.id(), t(2026, 1),
-                    Boarding.BOARDING);
-
-            assertThat(switched.amount()).isEqualTo(Ugx.of(250_000));
-            assertThat(switched.amountOverridden()).isTrue();
-            assertThat(finance.studentAccounts.setAmount(amina.id(), t(2026, 1), null).amount())
-                    .isEqualTo(Ugx.of(500_000));
         }
     }
 
@@ -215,7 +137,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-5: opening an earlier term doesn't add a student who joined later, or give them debt")
         void earlierTermsOnlyListWhoWasThere() {
-            p7DayFee();
+            p7Fees();
             add(2026, 1, "Ann", "Akello");
             finance.studentAccounts.openTerm(t(2026, 3));
             Student cara = add(2026, 3, "Cara", "Nambi");
@@ -245,7 +167,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-7: moving Joined earlier puts the student on earlier terms; their debt carries from them")
         void joinedEarlier() {
-            p7DayFee();
+            p7Fees();
             add(2026, 1, "Ann", "Akello");
             finance.studentAccounts.openTerm(t(2026, 3));
             Student cara = add(2026, 3, "Cara", "Nambi");
@@ -264,7 +186,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-7: moving Joined later takes them off earlier terms without payments; past a payment it's refused")
         void joinedLater() {
-            p7DayFee();
+            p7Fees();
             Student dan = add(2026, 1, "Dan", "Mugisha");
             finance.studentAccounts.openTerm(t(2026, 2));
             finance.studentAccounts.setPayment(dan.id(), t(2026, 2), 1, Ugx.of(50_000));
@@ -283,7 +205,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-7: Joined can't be after a Left student's last term")
         void joinedAfterLastTerm() {
-            p7DayFee();
+            p7Fees();
             Student eve = add(2026, 1, "Eve", "Nakku");
             edit(eve, 2026, 1, t(2026, 1), StudentStatus.LEFT);
 
@@ -295,7 +217,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-8: marked Left on Term 1, Term 1 is unchanged but tagged; later terms lose him unless he paid there")
         void markingLeft() {
-            p7DayFee();
+            p7Fees();
             Student ann = add(2026, 1, "Ann", "Akello");
             Student ben = add(2026, 1, "Ben", "Okello");
             finance.studentAccounts.setPayment(ben.id(), t(2026, 1), 1, Ugx.of(100_000));
@@ -320,7 +242,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-9: marked Active again on Term 2, the student is back on Term 2 and on later terms")
         void markingActiveAgain() {
-            p7DayFee();
+            p7Fees();
             Student ben = add(2026, 1, "Ben", "Okello");
             finance.studentAccounts.openTerm(t(2026, 2));
             edit(ben, 2026, 1, t(2026, 1), StudentStatus.LEFT);
@@ -340,7 +262,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-10: Left students are listed and counted in the term's totals")
         void leftStudentsAreListedAndCounted() {
-            p7DayFee();
+            p7Fees();
             add(2026, 1, "Ann", "Akello");
             add(2026, 1, "Cara", "Nambi");
             Student ben = add(2026, 1, "Ben", "Okello");
@@ -364,11 +286,10 @@ class StudentUpdatesTest extends FinanceTest {
         @DisplayName("AC-11: nothing done on Terms 2 and 3 changes Term 1")
         void laterActionsLeaveTerm1Alone() {
             p7Fees();
-            finance.studentAccounts.setClassFee(SchoolClass.P3, t(2026, 1), Ugx.of(200_000),
-                    Ugx.of(350_000), Ugx.of(5_000));
+            finance.studentAccounts.setClassReam(SchoolClass.P3, t(2026, 1), Ugx.of(5_000));
             Student ann = addAs(Boarding.DAY, "Ann", "Akello");
             Student ben = finance.studentAccounts.addStudent(t(2026, 1), "Ben", "Okello",
-                    SchoolClass.P3, Residency.NATIONAL, Boarding.BOARDING);
+                    SchoolClass.P3, Residency.NATIONAL, Boarding.BOARDING, Ugx.of(350_000));
             finance.studentAccounts.setPayment(ann.id(), t(2026, 1), 1, Ugx.of(100_000));
             finance.studentAccounts.setPayment(ben.id(), t(2026, 1), 2, Ugx.of(50_000));
             finance.studentAccounts.setDebt(ann.id(), t(2026, 1), Ugx.of(5_000));
@@ -381,12 +302,10 @@ class StudentUpdatesTest extends FinanceTest {
             ClassFee p7 = finance.studentAccounts.classFee(SchoolClass.P7, t(2026, 1));
             ClassFee p3 = finance.studentAccounts.classFee(SchoolClass.P3, t(2026, 1));
 
-            finance.studentAccounts.setClassFee(SchoolClass.P7, t(2026, 2), Ugx.of(320_000),
-                    Ugx.of(520_000), Ugx.of(12_000));
-            finance.studentAccounts.setClassFee(SchoolClass.P3, t(2026, 3), Ugx.of(210_000),
-                    Ugx.of(360_000), Ugx.of(6_000));
+            finance.studentAccounts.setClassReam(SchoolClass.P7, t(2026, 2), Ugx.of(12_000));
+            finance.studentAccounts.setClassReam(SchoolClass.P3, t(2026, 3), Ugx.of(6_000));
             finance.studentAccounts.addStudent(t(2026, 2), "Cara", "Nambi", SchoolClass.P7,
-                    Residency.NATIONAL, Boarding.BOARDING);
+                    Residency.NATIONAL, Boarding.BOARDING, Ugx.of(500_000));
             finance.studentAccounts.setBoarding(ann.id(), t(2026, 2), Boarding.BOARDING);
             finance.studentAccounts.setAmount(ann.id(), t(2026, 3), Ugx.of(250_000));
             finance.studentAccounts.setDebt(ann.id(), t(2026, 2), Ugx.of(1_000));
@@ -412,7 +331,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-12: Edit student saves trimmed names and Refugee, shown on every term; class stays")
         void savesNames() {
-            p7DayFee();
+            p7Fees();
             Student ben = add(2026, 1, "Ben", "Okello");
             finance.studentAccounts.openTerm(t(2026, 2));
 
@@ -430,7 +349,7 @@ class StudentUpdatesTest extends FinanceTest {
         @Test
         @DisplayName("AC-12: an empty first name is refused with 001's message and nothing in that save is applied")
         void refusedSaveAppliesNothing() {
-            p7DayFee();
+            p7Fees();
             Student ben = add(2026, 1, "Ben", "Okello");
 
             assertThatThrownBy(() -> finance.studentAccounts.editStudent(ben.id(), t(2026, 1),

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.angelscare.management.calendar.model.TermRef;
 import org.angelscare.management.common.Ugx;
+import org.angelscare.management.student.model.Boarding;
 import org.angelscare.management.student.model.Residency;
 import org.angelscare.management.student.model.SchoolClass;
 import org.angelscare.management.student.model.Student;
@@ -25,7 +26,7 @@ class EditStudentViewModelTest extends ScreenTest {
         createYear(2026);
         createYear(2027);
         ben = finance.studentAccounts.addStudent(t(2026, 2), "Ben", "Okello", SchoolClass.P5,
-                Residency.NATIONAL);
+                Residency.NATIONAL, Boarding.DAY, Ugx.of(300_000));
         page = studentsPage();
         page.show(t(2026, 2));
     }
