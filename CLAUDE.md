@@ -69,15 +69,19 @@ Package by feature under `org.angelscare.management`, layered inside each featur
   no message. Catch, log, and show the error in a window.
 - All data lives in `~/AngelsCareData/`, outside the install directory. Don't move it.
 
-## Workflow: spec-driven + test-driven
-Every non-trivial feature follows this; small fixes can skip the spec but not the test.
-1. **Spec**: `/spec` writes `docs/specs/NNN-name.md` (goal, acceptance criteria `AC-1…` as
-   Given/When/Then, open decisions, out of scope). Status must be `Approved` by Finn before step 2.
-2. **Red**: `/tdd NNN` writes failing tests, one or more per AC, named after it
-   (`@DisplayName("AC-2: …")`), runs them, and shows they fail. **Stop for Finn's review.**
-3. **Green**: implement the minimum to pass, then refactor with tests green.
-4. **Verify**: full `./gradlew test`, then run the app and exercise the feature, including empty,
-   zero and boundary cases. Say what was verified vs. assumed.
+## Workflow: two steps, spec then implement
+Finn describes what he wants; every non-trivial feature then goes through two steps. Small fixes
+can skip the spec.
+1. **Spec** (`/spec`): read the description, ask clarifying questions until the behaviour is
+   unambiguous, then write `docs/specs/NNN-name.md` (goal, behaviour, acceptance criteria `AC-1…`
+   as Given/When/Then, open decisions, out of scope). **Stop for Finn's approval.**
+2. **Implement** (`/implement NNN`): once Finn approves, build it, then verify: full
+   `./gradlew test`, run the app and exercise the feature, including empty, zero and boundary
+   cases. Say what was verified vs. assumed.
+
+Finn's approval in chat is enough to start step 2; he doesn't need to type `/implement`.
+Tests are not written first, but keep the suite green and add tests where they protect a business
+rule.
 
 Testing conventions:
 - Repository tests run against a **real temp-file SQLite DB with Flyway applied**, not mocks.
@@ -102,5 +106,4 @@ Testing conventions:
 - JavaFX runs from the classpath, so the main class is `Launcher`, not `FxApp`; the "Unsupported
   JavaFX configuration" warning at start-up is expected.
 - The Stop hook (`.claude/hooks/run-tests.sh`) runs the tests when a turn ends and sends failures
-  back to Claude. `/tdd` creates `.claude/state/red-phase` so the hook allows stopping on
-  deliberately failing tests.
+  back to Claude.

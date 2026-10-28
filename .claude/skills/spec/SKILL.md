@@ -1,20 +1,22 @@
 ---
 name: spec
-description: Write a feature spec for Angels Care (docs/specs/NNN-name.md) by interviewing Finn. Use when starting any non-trivial feature, before any code or tests are written.
-argument-hint: <feature idea>
+description: Step 1 of every Angels Care feature - read Finn's description, ask clarifying questions, and write a spec (docs/specs/NNN-name.md) for his approval. Use whenever Finn describes a feature or change he wants, before any code is written.
+argument-hint: <feature description>
 ---
 
-# /spec: write a feature spec
+# /spec: step 1, from description to approved spec
 
-The output is a **Draft** spec. Do not write tests or production code in this skill; that is `/tdd`.
+Finn describes what he wants; this skill turns it into a **Draft** spec and stops for his
+approval. Do not write production code here; that is step 2 (`/implement`).
 
 ## 1. Understand before asking
+- Read Finn's description carefully and restate it to yourself as concrete behaviour.
 - Re-read the rules in `CLAUDE.md` (money, schema, start-up); the spec must not contradict them.
 - Read existing specs in `docs/specs/` for decisions already made, and read the code this feature
   touches. Don't ask Finn anything the code or an earlier spec already answers.
 - Next number = highest existing `NNN` + 1, zero-padded to three digits.
 
-## 2. Interview
+## 2. Ask clarifying questions
 Use AskUserQuestion, in rounds of up to 4 questions, until the behaviour is unambiguous.
 - Only ask questions whose answer changes what gets built. Put the recommended option first and
   say why.
@@ -28,12 +30,15 @@ Use AskUserQuestion, in rounds of up to 4 questions, until the behaviour is unam
 
 ## 3. Write the spec
 - Copy `docs/specs/TEMPLATE.md` to `docs/specs/NNN-short-name.md` and fill every section.
-- Acceptance criteria are **Given/When/Then** and each can be checked by an automated test. A
-  criterion that can only be checked by eye (layout, Windows packaging) says so explicitly.
+- Acceptance criteria are **Given/When/Then**, concrete enough that Finn can check each one in
+  the app. Cover the empty, zero and boundary cases.
 - Keep deferred ideas in "Out of scope", not half-specified in the body.
 - Leave `Status: Draft`.
 
-## 4. Hand back
-Summarise the spec in a few lines, list the open decisions with your recommendations, and stop.
-When Finn approves, set `Status: Approved (YYYY-MM-DD)`, move resolved open decisions into a
-"Decisions" section, and point him to `/tdd NNN`.
+## 4. Hand back for approval
+Summarise the spec in a few lines, list any remaining open decisions with your recommendations,
+and **stop**. Don't start implementing in the same turn.
+
+When Finn approves (in words, e.g. "approved", "go ahead"): set `Status: Approved (YYYY-MM-DD)`,
+move resolved open decisions into a "Decisions" section, and continue straight into step 2 by
+following `/implement NNN`. If he asks for changes instead, revise the spec and stop again.

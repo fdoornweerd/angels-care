@@ -21,8 +21,8 @@ code's.
 - **Other:** README, CLAUDE.md, CI — only if they change.
 
 ## Acceptance criteria
-Each one becomes at least one test named `AC-n: …`. Cover the empty, zero and boundary cases,
-not just the happy path.
+Concrete enough to check each one in the app after implementing. Cover the empty, zero and
+boundary cases, not just the happy path.
 - **AC-1** Given …, when …, then ….
 - **AC-2** …
 
