@@ -1,6 +1,6 @@
 # 005: Printable year report
 
-**Status:** Implemented (2026-10-28); AC-1 and AC-17 checked by eye on the Mac from the real database's report (the button itself not clicked through), AC-18 awaiting the Windows test round · **Branch:** `feature/005-year-report`
+**Status:** Implemented (2026-10-28); AC-1 and AC-17 checked by eye on the Mac with the real database, the button clicked through by Finn, AC-18 awaiting the Windows test round · **Branch:** `feature/005-year-report`
 <!-- Draft → Approved (date) → Implemented (date). Only Finn moves a spec to Approved. -->
 
 ## Goal
@@ -152,9 +152,8 @@ their cell rather than being cut off.
   "No expense categories." for that term.
 
 ## Decisions
-1. **Branch.** Spec 004 isn't merged into `main` yet, so `feature/005-year-report` is cut from
-   `feature/004-update-students` (the report prints the typed amounts), and rebased onto `main`
-   once 004 is merged.
+1. **Branch.** `feature/005-year-report` was cut from `feature/004-update-students`, thought to
+   be unmerged; 004 had in fact been merged into `main` (PR 6), so no rebase was needed.
 2. **PDF library: OpenPDF**, over Apache PDFBox, which only draws text and lines and would need
    its own table layout. Its licence allows use in a closed app without changes.
 3. **One file per year, not per term.** A per-term button can be added later if the bookkeeper
