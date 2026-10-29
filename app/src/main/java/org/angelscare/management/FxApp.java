@@ -36,6 +36,8 @@ public class FxApp extends Application {
             root = switch (startup) {
                 case StartupResult.Started started -> {
                     context = started.context();
+                    // For opening a saved report in the PC's PDF viewer (JavaFxFileDialogs).
+                    context.getBeanFactory().registerSingleton("hostServices", getHostServices());
                     yield loadView("/fxml/shell/main.fxml");
                 }
                 case StartupResult.Failed failed -> errorView(failed.message());

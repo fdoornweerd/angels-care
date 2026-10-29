@@ -145,6 +145,7 @@ app/src/main/java/org/angelscare/management/
     common/                     shared building blocks: Ugx (money), Ids, Clock
     db/                         SQLite DataSource, device identity
     shell/ui/                   main window controller
+    report/                     the printable PDF report of a school year (OpenPDF)
 app/src/main/resources/
     db/migration/               Flyway migrations (V1__baseline.sql, ...)
     fxml/                       JavaFX views, one folder per feature

@@ -1,10 +1,15 @@
 package org.angelscare.management.calendar.ui;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.file.FileSystemException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
@@ -24,8 +29,12 @@ import org.angelscare.management.calendar.model.TermDates;
 import org.angelscare.management.calendar.service.CalendarService;
 import org.angelscare.management.common.SchoolTime;
 import org.angelscare.management.common.ValidationException;
+import org.angelscare.management.Diagnostics;
 import org.angelscare.management.common.ui.ConfirmDialogs;
 import org.angelscare.management.common.ui.ErrorMessages;
+import org.angelscare.management.common.ui.FileDialogs;
+import org.angelscare.management.report.service.YearReportPdf;
+import org.angelscare.management.report.service.YearReportService;
 
 /** Page 1: the school years with their totals, and the form to add or change one. */
 public class SchoolYearsViewModel {
@@ -38,6 +47,9 @@ public class SchoolYearsViewModel {
     private final CalendarService calendar;
     private final TermAccountsService accounts;
     private final ConfirmDialogs dialogs;
+    private final YearReportService reports;
+    private final YearReportPdf pdf;
+    private final FileDialogs files;
     private final Clock clock;
 
     private final ObservableList<YearRow> rows = FXCollections.observableArrayList();
@@ -54,11 +66,15 @@ public class SchoolYearsViewModel {
     private SchoolYear editingYear;
 
     public SchoolYearsViewModel(SchoolYearSetupService setup, CalendarService calendar,
-            TermAccountsService accounts, ConfirmDialogs dialogs, Clock clock) {
+            TermAccountsService accounts, ConfirmDialogs dialogs, YearReportService reports,
+            YearReportPdf pdf, FileDialogs files, Clock clock) {
         this.setup = setup;
         this.calendar = calendar;
         this.accounts = accounts;
         this.dialogs = dialogs;
+        this.reports = reports;
+        this.pdf = pdf;
+        this.files = files;
         this.clock = clock;
         for (int i = 0; i < CalendarService.TERMS_PER_YEAR; i++) {
             starts.add(new SimpleObjectProperty<>());
@@ -187,6 +203,43 @@ public class SchoolYearsViewModel {
         return true;
     }
 
+    /** "Angels Care 2026-2027 report.pdf". */
+    public static String reportFileName(SchoolYear year) {
+        return "Angels Care " + year.label() + " report.pdf";
+    }
+
+    /**
+     * The year's PDF report (spec 005): asks where to save it, writes it, and opens it for
+     * printing. False if cancelled or it couldn't be saved; a report saved but not opened is true,
+     * with a message saying where it is.
+     */
+    public boolean saveReport(SchoolYear year) {
+        error.set("");
+        Optional<Path> chosen = files.choosePdfToSave(files.documentsFolder(), reportFileName(year));
+        if (chosen.isEmpty()) {
+            return false;
+        }
+        Path file = withPdfExtension(chosen.get());
+        try {
+            // Drawn in memory first, so a failure while drawing leaves no half-written file.
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            pdf.write(reports.report(year.year()), bytes);
+            Files.write(file, bytes.toByteArray());
+        } catch (Exception e) {
+            Diagnostics.log("Could not save the report " + file, e);
+            error.set("The report could not be saved: " + reason(e));
+            return false;
+        }
+        try {
+            files.open(file);
+        } catch (Exception e) {
+            Diagnostics.log("Could not open the report " + file, e);
+            error.set("The report was saved to " + file + ", but it could not be opened. Open it"
+                    + " from that folder to print it.");
+        }
+        return true;
+    }
+
     public ReadOnlyStringProperty errorProperty() {
         return error.getReadOnlyProperty();
     }
@@ -216,6 +269,19 @@ public class SchoolYearsViewModel {
         copyLabel.set(previous.map(p -> "Copy income and expense categories and items from "
                 + p.label()).orElse(""));
         copyFromPrevious.set(previous.isPresent());
+    }
+
+    private static Path withPdfExtension(Path file) {
+        String name = file.getFileName().toString();
+        return name.toLowerCase(Locale.ROOT).endsWith(".pdf")
+                ? file : file.resolveSibling(name + ".pdf");
+    }
+
+    /** The system's own words for why, e.g. "The process cannot access the file …". */
+    private static String reason(Exception e) {
+        String message = e instanceof FileSystemException fs && fs.getReason() != null
+                ? fs.getReason() : e.getMessage();
+        return message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
     }
 
     private TermDates dates(int number) {
