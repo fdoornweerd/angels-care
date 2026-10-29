@@ -156,17 +156,19 @@ class SchoolYearsController implements PageController {
         startYear.setText(String.valueOf(year.year()));
     }
 
-    /** "Edit dates" and "Delete" for each year. */
+    /** "PDF report", "Edit dates" and "Delete" for each year. */
     private TableColumn<YearRow, String> actionsColumn() {
         TableColumn<YearRow, String> column = new TableColumn<>("");
         column.setSortable(false);
-        column.setMinWidth(150);
+        column.setMinWidth(250);
         column.setCellFactory(c -> new TableCell<>() {
+            private final Button report = new Button("PDF report");
             private final Button edit = new Button("Edit dates");
             private final Button delete = new Button("Delete");
-            private final HBox buttons = new HBox(6, edit, delete);
+            private final HBox buttons = new HBox(6, report, edit, delete);
 
             {
+                report.setOnAction(e -> page.saveReport(getTableRow().getItem().year()));
                 edit.setOnAction(e -> edit(getTableRow().getItem().year()));
                 delete.setOnAction(e -> page.delete(getTableRow().getItem().year()));
             }

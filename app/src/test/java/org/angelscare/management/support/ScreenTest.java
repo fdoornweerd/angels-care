@@ -3,6 +3,8 @@ package org.angelscare.management.support;
 import org.angelscare.management.accounts.ui.DetailViewModel;
 import org.angelscare.management.accounts.ui.TermSummaryViewModel;
 import org.angelscare.management.calendar.ui.SchoolYearsViewModel;
+import org.angelscare.management.report.service.YearReportPdf;
+import org.angelscare.management.report.service.YearReportService;
 import org.angelscare.management.shell.ui.Navigator;
 import org.angelscare.management.student.ui.StudentsViewModel;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,10 +16,18 @@ import org.junit.jupiter.api.BeforeEach;
 public abstract class ScreenTest extends FinanceTest {
 
     protected FakeDialogs dialogs;
+    protected FakeFileDialogs files;
 
     @BeforeEach
     void createDialogs() {
         dialogs = new FakeDialogs();
+        files = new FakeFileDialogs(tempDir.resolve("Documents"));
+    }
+
+    protected YearReportService yearReports() {
+        return new YearReportService(finance.calendar, finance.accounts, finance.incomeCatalog,
+                finance.expenseCatalog, finance.incomeSheet, finance.expenseSheet,
+                finance.studentAccounts, clock);
     }
 
     protected Navigator navigator() {
@@ -26,7 +36,7 @@ public abstract class ScreenTest extends FinanceTest {
 
     protected SchoolYearsViewModel schoolYearsPage() {
         return new SchoolYearsViewModel(finance.setup, finance.calendar, finance.accounts, dialogs,
-                clock);
+                yearReports(), new YearReportPdf(), files, clock);
     }
 
     protected TermSummaryViewModel termSummaryPage() {

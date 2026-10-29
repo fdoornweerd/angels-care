@@ -2,6 +2,7 @@
 spring-boot = "4.1.1"
 sqlite-jdbc = "3.53.4.0"
 javafx = "21.0.12"
+openpdf = "2.0.3"
 
 [libraries]
 # Spring Boot's BOM pins versions for everything below that has no version of its own
@@ -14,6 +15,8 @@ spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-st
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+# The year report (spec 005): tables that split across pages, in plain Java.
+openpdf = { module = "com.github.librepdf:openpdf", version.ref = "openpdf" }
 
 [plugins]
 javafx = { id = "org.openjfx.javafxplugin", version = "0.1.0" }

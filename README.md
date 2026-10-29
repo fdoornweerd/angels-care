@@ -88,7 +88,8 @@ Requires JDK 21. Gradle downloads a matching toolchain automatically if you do n
 ./gradlew jpackage              # build a native installer for the machine you are on
 ```
 
-New features are written spec-first and test-first: see `CLAUDE.md` and `docs/specs/`.
+New features are specced first, then implemented once the spec is approved: see `CLAUDE.md`
+and `docs/specs/`.
 
 ### Building the Windows installer
 
@@ -144,11 +145,12 @@ app/src/main/java/org/angelscare/management/
     common/                     shared building blocks: Ugx (money), Ids, Clock
     db/                         SQLite DataSource, device identity
     shell/ui/                   main window controller
+    report/                     the printable PDF report of a school year (OpenPDF)
 app/src/main/resources/
     db/migration/               Flyway migrations (V1__baseline.sql, ...)
     fxml/                       JavaFX views, one folder per feature
 app/src/test/java/.../support/DatabaseTest.java   base class: a fresh migrated SQLite DB per test
 docs/specs/                     feature specs (TEMPLATE.md + NNN-name.md)
-.claude/                        Claude Code skills (/spec, /tdd), settings, test hook
+.claude/                        Claude Code skills (/spec, /implement), settings, test hook
 .github/workflows/build-windows.yml   runs tests on Windows for PRs; builds the installer on main
 ```

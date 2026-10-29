@@ -1,6 +1,7 @@
 package org.angelscare.management.shell.ui;
 
 import java.time.Clock;
+import javafx.application.HostServices;
 import org.angelscare.management.accounts.service.ExpenseCatalog;
 import org.angelscare.management.accounts.service.IncomeCatalog;
 import org.angelscare.management.accounts.service.LedgerSheetService;
@@ -11,9 +12,14 @@ import org.angelscare.management.accounts.ui.TermSummaryViewModel;
 import org.angelscare.management.calendar.service.CalendarService;
 import org.angelscare.management.calendar.ui.SchoolYearsViewModel;
 import org.angelscare.management.common.ui.ConfirmDialogs;
+import org.angelscare.management.common.ui.FileDialogs;
 import org.angelscare.management.common.ui.fx.JavaFxDialogs;
+import org.angelscare.management.common.ui.fx.JavaFxFileDialogs;
+import org.angelscare.management.report.service.YearReportPdf;
+import org.angelscare.management.report.service.YearReportService;
 import org.angelscare.management.student.service.StudentAccountService;
 import org.angelscare.management.student.ui.StudentsViewModel;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +36,12 @@ class PagesConfig {
         return new JavaFxDialogs();
     }
 
+    /** Host services are registered by FxApp once the window is built, so they are looked up late. */
+    @Bean
+    FileDialogs fileDialogs(ObjectProvider<HostServices> hostServices) {
+        return new JavaFxFileDialogs(hostServices::getIfAvailable);
+    }
+
     @Bean
     Navigator navigator(CalendarService calendar, Clock clock) {
         return new Navigator(calendar, clock);
@@ -38,8 +50,9 @@ class PagesConfig {
     @Bean
     SchoolYearsViewModel schoolYearsViewModel(SchoolYearSetupService setup,
             CalendarService calendar, TermAccountsService accounts, ConfirmDialogs dialogs,
-            Clock clock) {
-        return new SchoolYearsViewModel(setup, calendar, accounts, dialogs, clock);
+            YearReportService reports, YearReportPdf pdf, FileDialogs files, Clock clock) {
+        return new SchoolYearsViewModel(setup, calendar, accounts, dialogs, reports, pdf, files,
+                clock);
     }
 
     @Bean

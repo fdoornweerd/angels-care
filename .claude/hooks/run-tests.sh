@@ -11,11 +11,6 @@ fi
 
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
-# During the red phase of /tdd the tests are *meant* to fail and Claude is meant to stop for review.
-if [ -f .claude/state/red-phase ]; then
-    exit 0
-fi
-
 if out=$(./gradlew test --console=plain 2>&1); then
     exit 0
 fi
